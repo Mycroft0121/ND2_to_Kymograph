@@ -188,30 +188,6 @@ class ND2_extractor():
         time_elapsed = datetime.now() - start_t
         print('Time elapsed for extraction (hh:mm:ss.ms) {}'.format(time_elapsed))
 
-    # # get position name if xml is available
-    # if xml_file:
-    #     if not xml_dir:
-    #         xml_dir = file_directory
-    #     pos_dict, lane_dict, pos_offset = pos_info(xml_file, xml_dir)
-    # # otherwise get lane info from y_um
-    # else:
-    #     lane_dict, pos_offset = lane_info(nd2_file)
-    # os.chdir(file_directory)
-    #
-    # # switch to another ND2reader for faster iterations
-    # nd2_file_name = nd2_file[:-4]
-    # nd2 = nd2reader.Nd2(nd2_file)
-    #
-    # main_dir = file_directory+"/"+nd2_file_name
-    # if not os.path.exists(main_dir):
-    #     os.makedirs(main_dir, 0755)
-    #
-    # # parallelize extraction
-    # cores = multiprocessing.cpu_count()
-    # pool = multiprocessing.Pool(processes=cores)
-    # poses = nd2.fields_of_view
-    # pool.map(tiff_extractor, poses)
-
 
 
 
