@@ -38,7 +38,7 @@ from datetime import datetime
 #import pandas as pd
 
 
-# step 1, extract ND2 and save as usual
+# step 1, extract ND2 and save as stacks
 class ND2_extractor():
     def __init__(self, input_path, ND2_name, output_path=None):
         self.input_path = input_path
@@ -57,7 +57,7 @@ class trench_kymograph():
 
     # generate stacks for each fov, find the max intensity
     def get_trenches(self, stacks):
-        # generate stacks
+
 
         # find the max intensity for all stacks
 
