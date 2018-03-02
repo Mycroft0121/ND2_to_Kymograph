@@ -1,4 +1,5 @@
 import matplotlib
+
 matplotlib.use('Agg')
 import matplotlib.pyplot as pl
 import numpy as np
@@ -8,6 +9,7 @@ import glob    # pathname pattern
 import os
 import json
 from PIL import Image
+from tifffile import imsave
 from skimage import filters
 from skimage import exposure
 from skimage import morphology
@@ -21,7 +23,8 @@ from scipy.misc import toimage
 from scipy.stats import mode
 from scipy import ndimage as ndi
 from scipy.ndimage.morphology import distance_transform_edt
-from multiprocessing import Pool
+#from multiprocessing import Pool
+
 
 
 # from ND2 extractor
@@ -32,17 +35,17 @@ import shutil
 import PIL
 import numpy as np
 from pims import ND2_Reader
-import multiprocessing
+#from pathos.multiprocessing import ProcessingPool as Pool
+#import multiprocessing
 import functools
 import xml.etree.cElementTree as ET
 import re
+import pathos.multiprocessing
 
 from datetime import datetime
 
 
-
-
-# step 1, extract ND2 and save as stacks
+# step 1, extract ND2 as usual
 class ND2_extractor():
     def __init__(self, nd2_file, file_directory, xml_file=None, xml_dir=None, output_path=None):
         self.input_path    = file_directory
@@ -85,6 +88,7 @@ class ND2_extractor():
 
     def pos_info(self):
         cur_dir = os.getcwd()
+
         os.chdir(self.xml_dir)
         tree = ET.ElementTree(file=self.xml_file)
         root = tree.getroot()[0]
@@ -118,11 +122,11 @@ class ND2_extractor():
     def tiff_extractor(self, pos):
         nd2 = nd2reader.Nd2(self.nd2_f)
         if self.pos_dict:
-            new_dir = self.main_dir + "/Lane_" + str(self.lane_dict[pos]) + "/" + self.pos_dict[pos] + "/"
+            new_dir = self.main_dir + "/Lane_" + str(self.lane_dict[pos]).zfill(2) + "/" + self.pos_dict[pos] + "/"
         else:
             lane_ind = self.lane_dict[pos]
             pos_off = self.pos_offset[lane_ind]
-            new_dir = self.main_dir + "/Lane_" + str(lane_ind) + "/pos_" + str(pos - pos_off) + "/"
+            new_dir = self.main_dir + "/Lane_" + str(lane_ind) + "/pos_" + str(pos - pos_off).zfill(3) + "/"
 
         # create a folder for each position
         if not os.path.exists(new_dir):
@@ -132,19 +136,13 @@ class ND2_extractor():
         if self.pos_dict:
             meta_name = self.nd2_file_name + "_" + self.pos_dict[pos] + "_t"
         else:
-            meta_name = self.nd2_file_name + "_pos_" + str(pos - pos_off) + "_t"
+            meta_name = self.nd2_file_name + "_pos_" + str(pos - pos_off).zfill(3) + "_t"
 
-
-
-        # TODO modify to save in stacks
         for image in nd2.select(fields_of_view=pos):
             channel = image._channel
             channel = str(channel.encode('ascii', 'ignore'))
             time_point = image.frame_number
-            if time_point < 10:
-                time_point = "0" + str(time_point)
-                time_point = str(time_point)
-            tiff_name = meta_name + str(time_point) + "_c_" + channel + ".tiff"
+            tiff_name = meta_name + str(time_point).zfill(4) + "_c_" + channel + ".tiff"
 
             # save file in 16-bit
             # thanks to http://shortrecipes.blogspot.com/2009/01/python-python-imaging-library-16-bit.html
@@ -155,64 +153,73 @@ class ND2_extractor():
         os.chdir(self.file_dir)
 
 
-
     def run_extraction(self):
         start_t = datetime.now()
 
-        os.chdir(self.file_directory)
+        os.chdir(self.input_path)
         # get position name if xml is available
         if self.xml_file:
             if not self.xml_dir:
-                self.xml_dir = self.file_directory
+                self.xml_dir = self.input_path
                 ND2_extractor.pos_info(self)
-            #pos_dict, lane_dict, pos_offset = pos_info(xml_file, xml_dir)
         # otherwise get lane info from y_um
         else:
-            ND2_extractor.lane_info(self.nd2_file)
-        os.chdir(self.file_directory)
+            self.lane_info()
+        os.chdir(self.input_path)
 
         # switch to another ND2reader for faster iterations
-        # nd2_file_name = nd2_file[:-4]
         nd2 = nd2reader.Nd2(self.nd2_file)
 
-        main_dir = self.file_directory + "/" + self.nd2_file_name
+        main_dir = self.input_path + "/" + self.nd2_file_name
         if not os.path.exists(main_dir):
             os.makedirs(main_dir, 0755)
 
         # parallelize extraction
-        cores = multiprocessing.cpu_count()
-        pool = multiprocessing.Pool(processes=cores)
         poses = nd2.fields_of_view
-        pool.map(ND2_extractor.tiff_extractor, poses)
+        cores = pathos.multiprocessing.cpu_count()
+        pool = pathos.multiprocessing.Pool(cores)
+        pool.map(self.tiff_extractor, poses)
+
 
         time_elapsed = datetime.now() - start_t
         print('Time elapsed for extraction (hh:mm:ss.ms) {}'.format(time_elapsed))
 
 
+nd2_file = "ID_Membrane.nd2"
+file_directory = "/Volumes/Samsung_T3/DATA_IDS"
+new_extractor = ND2_extractor(nd2_file,file_directory)
+new_extractor.run_extraction()
 
 
 
 
-
-class trench_kymograph():
-    def __init__(self, path, lane, channel, time, fov, bit_info):
-        self.
-
-
-    # generate stacks for each fov, find the max intensity
-    def get_trenches(self, stacks):
-
-
-        # find the max intensity for all stacks
-
-        # intensity scanning to find the box containing each trench
-
-        # return a list of box coordinates
-
-
-    def kymograph(self, coordinates):
-        # cut each fov with the coordinates
-        # generate kymograph from it
+#############
+# will use a lot from Sadik's code
+# class trench_kymograph():
+#     def __init__(self, file_directory, lane, channel, time, fov, bit_info):
+#         self.main_path = file_directory
+#         self.lane = lane
+#         self.channel = channel
+#
+#
+#
+#
+#     # generate stacks for each fov, find the max intensity
+#     def get_trenches(self, stacks):
+#
+#
+#         # find the max intensity for all or first 200 stacks
+#         # example function
+#         # ans = numpy.amax(arr_3D, axis=2)
+#
+#         # intensity scanning to find the box containing each trench
+#
+#         # return a list of box coordinates
+#
+#
+#     def kymograph(self, coordinates):
+#         # cut each fov with the coordinates
+#         # generate kymograph from it
 
 
 
