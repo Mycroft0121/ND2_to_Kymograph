@@ -124,7 +124,7 @@ class ND2_extractor():
         else:
             lane_ind = self.lane_dict[pos]
             pos_off = self.pos_offset[lane_ind]
-            new_dir = self.main_dir + "/Lane_" + str(lane_ind) + "/pos_" + str(pos - pos_off).zfill(3) + "/"
+            new_dir = self.main_dir + "/Lane_" + str(lane_ind).zfill(2) + "/pos_" + str(pos - pos_off).zfill(3) + "/"
 
         # create a folder for each position
         if not os.path.exists(new_dir):
@@ -183,6 +183,10 @@ class ND2_extractor():
         print('Time elapsed for extraction (hh:mm:ss.ms) {}'.format(time_elapsed))
 
 
+        # TODO
+        # return # of lanes, fov, channels
+
+
 ##########
 # test
 # nd2_file = "ID_Membrane.nd2"
@@ -195,31 +199,39 @@ class ND2_extractor():
 
 #############
 # will use a lot from Sadik's code
-# class trench_kymograph():
-#     def __init__(self, file_directory, lane, channel, time, fov, bit_info):
-#         self.main_path = file_directory
-#         self.lane = lane
-#         self.channel = channel
-#
-#
-#
-#
-#     # generate stacks for each fov, find the max intensity
-#     def get_trenches(self, stacks):
-#
-#
-#         # find the max intensity for all or first 200 stacks
-#         # example function
-#         # ans = numpy.amax(arr_3D, axis=2)
-#
-#         # intensity scanning to find the box containing each trench
-#
-#         # return a list of box coordinates
-#
-#
-#     def kymograph(self, coordinates):
-#         # cut each fov with the coordinates
-#         # generate kymograph from it
+class trench_kymograph():
+    def __init__(self, nd2_file, file_directory, lane, channel, pos, frame_limit = None):
+        self.main_path = file_directory
+        self.lane = lane
+        self.channel = channel
+        self.pos = pos
+        self.frame_limit = frame_limit
+        self.pos_path    = file_directory + "/"+ nd2_file[:-4] + "/Lane_" + str(lane).zfill(2)  + "/pos_" + str(pos).zfill(3)
+
+
+
+
+    # generate stacks for each fov, find the max intensity
+    def get_trenches(self):
+        os.chdir(self.pos_path)
+
+        # sort files
+        # uniformly sampling n frames and superimpose them
+        # find the max intensity on superimposed
+        # example function
+        # ans = numpy.amax(arr_3D, axis=2)
+
+
+        # intensity scanning to find the box containing each trench
+
+        # return a list of box coordinates
+
+    def fix_rotation(self):
+
+
+    def kymograph(self, coordinates):
+        # cut each fov with the coordinates
+        # generate kymograph from it
 
 
 
