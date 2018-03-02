@@ -2,7 +2,7 @@ import matplotlib
 
 matplotlib.use('Agg')
 import matplotlib.pyplot as pl
-import numpy as np
+
 
 import re
 import glob    # pathname pattern
@@ -35,8 +35,6 @@ import shutil
 import PIL
 import numpy as np
 from pims import ND2_Reader
-#from pathos.multiprocessing import ProcessingPool as Pool
-#import multiprocessing
 import functools
 import xml.etree.cElementTree as ET
 import re
@@ -161,7 +159,7 @@ class ND2_extractor():
         if self.xml_file:
             if not self.xml_dir:
                 self.xml_dir = self.input_path
-                ND2_extractor.pos_info(self)
+                self.pos_info()
         # otherwise get lane info from y_um
         else:
             self.lane_info()
@@ -185,10 +183,12 @@ class ND2_extractor():
         print('Time elapsed for extraction (hh:mm:ss.ms) {}'.format(time_elapsed))
 
 
-nd2_file = "ID_Membrane.nd2"
-file_directory = "/Volumes/Samsung_T3/DATA_IDS"
-new_extractor = ND2_extractor(nd2_file,file_directory)
-new_extractor.run_extraction()
+##########
+# test
+# nd2_file = "ID_Membrane.nd2"
+# file_directory = "/Volumes/Samsung_T3/DATA_IDS"
+# new_extractor = ND2_extractor(nd2_file,file_directory)
+# new_extractor.run_extraction()
 
 
 
