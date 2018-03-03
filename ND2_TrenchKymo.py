@@ -120,7 +120,7 @@ class ND2_extractor():
     def tiff_extractor(self, pos):
         nd2 = nd2reader.Nd2(self.nd2_f)
         if self.pos_dict:
-            new_dir = self.main_dir + "/Lane_" + str(self.lane_dict[pos]).zfill(2) + "/" + self.pos_dict[pos] + "/"
+            new_dir = self.main_dir + "/Lane_" + str(self.lane_dict[pos]).im(2) + "/" + self.pos_dict[pos] + "/"
         else:
             lane_ind = self.lane_dict[pos]
             pos_off = self.pos_offset[lane_ind]
@@ -187,53 +187,218 @@ class ND2_extractor():
         # return # of lanes, fov, channels
 
 
-##########
-# test
-# nd2_file = "ID_Membrane.nd2"
-# file_directory = "/Volumes/Samsung_T3/DATA_IDS"
-# new_extractor = ND2_extractor(nd2_file,file_directory)
-# new_extractor.run_extraction()
-
-
-
-
 #############
 # will use a lot from Sadik's code
 class trench_kymograph():
-    def __init__(self, nd2_file, file_directory, lane, channel, pos, frame_limit = None):
-        self.main_path = file_directory
-        self.lane = lane
-        self.channel = channel
-        self.pos = pos
-        self.frame_limit = frame_limit
-        self.pos_path    = file_directory + "/"+ nd2_file[:-4] + "/Lane_" + str(lane).zfill(2)  + "/pos_" + str(pos).zfill(3)
-
+    def __init__(self, nd2_file, file_directory, lane, channel, pos, trench_length=None, frame_limit = None):
+        self.main_path     = file_directory
+        self.lane          = lane
+        self.channel       = channel
+        self.pos           = pos
+        self.frame_limit   = frame_limit
+        self.pos_path      = file_directory + "/"+ nd2_file[:-4] + "/Lane_" + str(lane).zfill(2)  + "/pos_" + str(pos).zfill(3)
+        self.trench_length = trench_length
 
 
 
     # generate stacks for each fov, find the max intensity
     def get_trenches(self):
+        # get the target files
         os.chdir(self.pos_path)
+        files = glob.glob(self.pos_path + '/*'+ self.channel + '.tiff')
 
-        # sort files
-        # uniformly sampling n frames and superimpose them
-        # find the max intensity on superimposed
-        # example function
-        # ans = numpy.amax(arr_3D, axis=2)
+        # sort files by time
+        def get_time(name):
+            sub_name  = name.split('_t')[1]
+            #print sub_name
+            num = sub_name.split('_c')[0]
+            return int(num)
+        files.sort(key=get_time)
 
+
+        # TODO find a beter way to superimpose data
+        # uniformly take n frames and superimpose them
+        # tentative n 200?
+        # n_frames = 200
+        # total_t = len(files)
+        # t_step = max(1, total_t/n_frames)
+        # # sum up each frame
+        # total_frame = len(xrange(1, total_t,t_step))
+        # image_ave = pl.imread(files[0]).astype(float)/float(total_frame)
+        # for i in xrange(1, total_t,t_step):
+        #     image_i    = pl.imread(files[i]).astype(float)/float(total_frame)
+        #     image_ave += image_i
+        #
+        # image_ave = image_ave.astype(np.uint16)
+        # out_file = "frame_average.tiff"
+        # out = PIL.Image.frombytes("I;16", (image_ave.shape[1], image_ave.shape[0]), image_ave.tobytes())
+        # out.save(out_file)
+
+
+        # for the sample data set, taking the first 50 frames
+        im = pl.imread(files[0])
+
+        if np.max(im) > 255:
+            im = (im // 256).astype(np.uint8)
+        im_ave = im /50.0
+        for i in xrange(1, 50):
+            im_i    = pl.imread(files[i])
+            if np.max(im_i) > 255:
+                im_i = (im_i // 256).astype(np.uint8)
+            im_ave += im_i/50.0
+        out_file = "frame_average.tiff"
+        im_ave = im_ave.astype(np.uint16)
+        out = PIL.Image.frombytes("I;16", (im_ave.shape[1], im_ave.shape[0]), im_ave.tobytes())
+        out.save(out_file)
 
         # intensity scanning to find the box containing each trench
 
+        # find the rough upper bound with horizontal intensity profile
+        intensity_scan = im_ave.sum(axis=1)
+        intensity_scan = intensity_scan / float(sum(intensity_scan))
+        exp_int = np.exp(intensity_scan) - 1
+        exp_int -= min(exp_int)
+        peak_ind = np.argmax(exp_int)
+        sub_intensity = exp_int[:peak_ind]
+        # take the ratio of intensity/max_intensity and regard any pixel
+        # lower than 14% of the max as non cells
+        max_ratio = sub_intensity / sub_intensity[-1]
+        upper_index = np.where(max_ratio > 0.12)[0][0]
+        lower_index = upper_index + self.trench_length
+
+
+        # crop image with upper & lower indice
+        im_trenches = im_ave[upper_index:lower_index]
+        intensity_scan = np.amax(im_trenches, axis=0)
+        intensity_scan = intensity_scan / float(sum(intensity_scan))
+        self.detect_peaks(threshold=45)
+
+
+        # find the trenches in x
+
+
+
+
+
+
+
+
+
+
         # return a list of box coordinates
-
-    def fix_rotation(self):
-
-
-    def kymograph(self, coordinates):
-        # cut each fov with the coordinates
-        # generate kymograph from it
-
-
+    #
+    # def fix_rotation(self):
+    #
+    #
+    # def kymograph(self, coordinates):
+    #     # cut each fov with the coordinates
+    #     # generate kymograph from it
 
 
 
+
+
+
+    @staticmethod
+    def detect_peaks(x, mph=None, mpd=1, threshold=0, edge='both', kpsh=False, valley=False, show=False, ax=None):
+        """Detect peaks in data based on their amplitude and other features.
+
+        Parameters
+        ----------
+        x : 1D array_like
+            data.
+        mph : {None, number}, optional (default = None)
+            detect peaks that are greater than minimum peak height.
+        mpd : positive integer, optional (default = 1)
+            detect peaks that are at least separated by minimum peak distance (in
+            number of data).
+        threshold : positive number, optional (default = 0)
+            detect peaks (valleys) that are greater (smaller) than `threshold`
+            in relation to their immediate neighbors.
+        edge : {None, 'rising', 'falling', 'both'}, optional (default = 'rising')
+            for a flat peak, keep only the rising edge ('rising'), only the
+            falling edge ('falling'), both edges ('both'), or don't detect a
+            flat peak (None).
+        kpsh : bool, optional (default = False)
+            keep peaks with same height even if they are closer than `mpd`.
+        valley : bool, optional (default = False)
+            if True (1), detect valleys (local minima) instead of peaks.
+        show : bool, optional (default = False)
+            if True (1), plot data in matplotlib figure.
+        ax : a matplotlib.axes.Axes instance, optional (default = None).
+
+        Returns
+        -------
+        ind : 1D array_like
+            indeces of the peaks in `x`.
+        """
+
+        x = np.atleast_1d(x).astype('float64')
+        if x.size < 3:
+            return np.array([], dtype=int)
+        if valley:
+            x = -x
+        # find indices of all peaks
+        dx = x[1:] - x[:-1]
+        # handle NaN's
+        indnan = np.where(np.isnan(x))[0]
+        if indnan.size:
+            x[indnan] = np.inf
+            dx[np.where(np.isnan(dx))[0]] = np.inf
+        ine, ire, ife = np.array([[], [], []], dtype=int)
+        if not edge:
+            ine = np.where((np.hstack((dx, 0)) < 0) & (np.hstack((0, dx)) > 0))[0]
+        else:
+            if edge.lower() in ['rising', 'both']:
+                ire = np.where((np.hstack((dx, 0)) <= 0) & (np.hstack((0, dx)) > 0))[0]
+            if edge.lower() in ['falling', 'both']:
+                ife = np.where((np.hstack((dx, 0)) < 0) & (np.hstack((0, dx)) >= 0))[0]
+        ind = np.unique(np.hstack((ine, ire, ife)))
+        # handle NaN's
+        if ind.size and indnan.size:
+            # NaN's and values close to NaN's cannot be peaks
+            ind = ind[np.in1d(ind, np.unique(np.hstack((indnan, indnan-1, indnan+1))), invert=True)]
+        # first and last values of x cannot be peaks
+        if ind.size and ind[0] == 0:
+            ind = ind[1:]
+        if ind.size and ind[-1] == x.size-1:
+            ind = ind[:-1]
+        # remove peaks < minimum peak height
+        if ind.size and mph is not None:
+            ind = ind[x[ind] >= mph]
+        # remove peaks - neighbors < threshold
+        if ind.size and threshold > 0:
+            dx = np.min(np.vstack([x[ind]-x[ind-1], x[ind]-x[ind+1]]), axis=0)
+            ind = np.delete(ind, np.where(dx < threshold)[0])
+        # detect small peaks closer than minimum peak distance
+        if ind.size and mpd > 1:
+            ind = ind[np.argsort(x[ind])][::-1]  # sort ind by peak height
+            idel = np.zeros(ind.size, dtype=bool)
+            for i in range(ind.size):
+                if not idel[i]:
+                    # keep peaks with the same height if kpsh is True
+                    idel = idel | (ind >= ind[i] - mpd) & (ind <= ind[i] + mpd) \
+                        & (x[ind[i]] > x[ind] if kpsh else True)
+                    idel[i] = 0  # Keep current peak
+            # remove the small peaks and sort back the indices by their occurrence
+            ind = np.sort(ind[~idel])
+
+        if show:
+            if indnan.size:
+                x[indnan] = np.nan
+            if valley:
+                x = -x
+            _plot(x, mph, mpd, threshold, edge, valley, ax, ind)
+
+        return ind
+
+
+
+###############
+# test
+nd2_file = "HYSTERESIS_GC_COLLECTION_INOCULATION.nd2"
+file_directory = "/Volumes/Samsung_T3"
+new_kymo = trench_kymograph(nd2_file,file_directory, 1,'MCHERRY', 15)
+new_kymo.get_trenches()
+# new_extractor = ND2_extractor(nd2_file,file_directory)
+# new_extractor.run_extraction()
