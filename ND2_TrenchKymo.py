@@ -398,7 +398,7 @@ class trench_kymograph():
 # test
 nd2_file = "HYSTERESIS_GC_COLLECTION_INOCULATION.nd2"
 file_directory = "/Volumes/Samsung_T3"
-new_kymo = trench_kymograph(nd2_file,file_directory, 1,'MCHERRY', 15)
+new_kymo = trench_kymograph(nd2_file, file_directory, 1,'MCHERRY', 15)
 new_kymo.get_trenches()
 # new_extractor = ND2_extractor(nd2_file,file_directory)
 # new_extractor.run_extraction()
