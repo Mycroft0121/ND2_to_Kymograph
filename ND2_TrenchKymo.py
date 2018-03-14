@@ -384,13 +384,9 @@ class trench_kymograph():
             trench_name = self.pos_path + "/Kymographs/Lane_" + str(self.lane).zfill(2)  + "_pos_" + str(self.pos).zfill(3) + "_trench_" + str(i+1)+'.tiff'
             out.save(trench_name)
 
-
-
-
-
-
-
-
+    def run_kymograph(self):
+        self.get_trenches()
+        self.kymograph()
 
 
     @staticmethod
@@ -492,8 +488,24 @@ class trench_kymograph():
 # test
 nd2_file = "HYSTERESIS_GC_COLLECTION_INOCULATION.nd2"
 file_directory = "/Volumes/Samsung_T3"
-new_kymo = trench_kymograph(nd2_file, file_directory, 1,'MCHERRY', 15, 248, 14)
-new_kymo.get_trenches()
+lane = 1,
+channel_list = ['GFP', 'MCHERRY']
+pos_list     = range(10,16)
+trench_length = 248
+trench_width  = 14
+
+for channel in channel_list:
+    for pos in pos_list:
+        print(channel, pos)
+        new_kymo = trench_kymograph(nd2_file, file_directory, lane,channel, pos, trench_length, trench_width)
+        new_kymo.run_kymograph()
+
+# class trench_kymograph():
+#     def __init__(self, nd2_file, file_directory, lane, channel, pos, trench_length, trench_width, frame_start=None, frame_limit = None):
+
+
+# new_kymo = trench_kymograph(nd2_file, file_directory, 1,'MCHERRY', 15, 248, 14)
+#new_kymo.get_trenches()
 # new_kymo.kymograph()
 
 # new_extractor = ND2_extractor(nd2_file,file_directory)
