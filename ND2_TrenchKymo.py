@@ -1,6 +1,6 @@
 import matplotlib
 
-matplotlib.use('Agg')
+# matplotlib.use('Agg')
 import matplotlib.pyplot as pl
 
 
@@ -51,7 +51,7 @@ class ND2_extractor():
         self.nd2_file_name = nd2_file[:-4]
         self.xml_file      = xml_file
         self.xml_dir       = xml_dir
-        self.output_path   =  output_path
+        self.output_path   = output_path
         self.main_dir      = file_directory+"/"+self.nd2_file_name
         self.nd2_f         = nd2_file
         self.file_dir      = file_directory
@@ -190,7 +190,7 @@ class ND2_extractor():
 #############
 # will use a lot from Sadik's code
 class trench_kymograph():
-    def __init__(self, nd2_file, file_directory, lane, channel, pos, trench_length=None, frame_limit = None):
+    def __init__(self, nd2_file, file_directory, lane, channel, pos, trench_length, trench_width, frame_start=None, frame_limit = None):
         self.main_path     = file_directory
         self.lane          = lane
         self.channel       = channel
@@ -198,8 +198,8 @@ class trench_kymograph():
         self.frame_limit   = frame_limit
         self.pos_path      = file_directory + "/"+ nd2_file[:-4] + "/Lane_" + str(lane).zfill(2)  + "/pos_" + str(pos).zfill(3)
         self.trench_length = trench_length
-
-
+        self.trench_width  = trench_width
+        self.frame_start   = frame_start
 
     # generate stacks for each fov, find the max intensity
     def get_trenches(self):
@@ -207,10 +207,12 @@ class trench_kymograph():
         os.chdir(self.pos_path)
         files = glob.glob(self.pos_path + '/*'+ self.channel + '.tiff')
 
+
+        # a helper function
         # sort files by time
         def get_time(name):
-            sub_name  = name.split('_t')[1]
-            #print sub_name
+            sub_name = name.split('_t')[1]
+            # print sub_name
             num = sub_name.split('_c')[0]
             return int(num)
         files.sort(key=get_time)
@@ -237,14 +239,21 @@ class trench_kymograph():
 
         # for the sample data set, taking the first 50 frames
         im = pl.imread(files[0])
-
         if np.max(im) > 255:
-            im = (im // 256).astype(np.uint8)
+            im_min = im.min()
+            im_max = im.max()
+            scaling_factor = (im_max - im_min)
+            im = (im - im_min)
+            im = (im * 255. / scaling_factor).astype(np.uint8)
         im_ave = im /50.0
         for i in xrange(1, 50):
             im_i    = pl.imread(files[i])
             if np.max(im_i) > 255:
-                im_i = (im_i // 256).astype(np.uint8)
+                im_min = im_i.min()
+                im_max = im_i.max()
+                scaling_factor = (im_max - im_min)
+                im_i = (im_i - im_min)
+                im_i = (im_i * 255. / scaling_factor).astype(np.uint8)
             im_ave += im_i/50.0
         out_file = "frame_average.tiff"
         im_ave = im_ave.astype(np.uint16)
@@ -263,36 +272,80 @@ class trench_kymograph():
         # take the ratio of intensity/max_intensity and regard any pixel
         # lower than 14% of the max as non cells
         max_ratio = sub_intensity / sub_intensity[-1]
-        upper_index = np.where(max_ratio > 0.12)[0][0]
-        lower_index = upper_index + self.trench_length
+        self.upper_index = np.where(max_ratio > 0.12)[0][0]
+        self.lower_index = self.upper_index + self.trench_length
 
 
-        # crop image with upper & lower indice
-        im_trenches = im_ave[upper_index:lower_index]
+        # crop image with upper & lower indices
+        im_trenches = im_ave[self.upper_index:self.lower_index]
+        # print(im_trenches.shape)
+        # convert to 8-bit, using the imageJ way
+        im_min = im_trenches.min()
+        im_max = im_trenches.max()
+        scaling_factor = (im_max - im_min)
+        im_trenches = (im_trenches - im_min)
+        im_trenches = (im_trenches * 255. / scaling_factor).astype(np.uint8)
         intensity_scan = np.amax(im_trenches, axis=0)
-        intensity_scan = intensity_scan / float(sum(intensity_scan))
-        self.detect_peaks(threshold=45)
+        peak_ind = self.detect_peaks(intensity_scan, mph=45, mpd=self.trench_width)
+        left_ind = peak_ind - self.trench_width/2
+
+        right_ind = peak_ind + self.trench_width/2
+        self.ind_list = zip(left_ind, right_ind)
+        print(len(self.ind_list))
+
+    def kymograph(self, frame_start=None, frame_limit=None):
+        if not os.path.isdir(self.pos_path + '/Kymographs'):
+            os.system('mkdir "' + self.pos_path + '/Kymographs"')
+        ori_files = glob.glob(self.pos_path + '/*'+self.channel+'*')
+
+        # a helper function
+        # sort files by time
+        def get_time(name):
+            sub_name = name.split('_t')[1]
+            num = sub_name.split('_c')[0]
+            return int(num)
+
+        ori_files.sort(key=get_time)
+        print(ori_files)
+
+        # if no frame limit specified use all frames
+        if frame_start is None:
+            frame_start = 1
+        if frame_limit is None:
+            frame_limit = len(ori_files)
+        trench_num = len(self.ind_list)
+
+        for i in xrange(trench_num):
+            # generate trench
+            # trench in T0
+            im_t = pl.imread(ori_files[frame_start - 1])
+
+            trench_left,trench_right = self.ind_list[i]
+            trench = im_t[self.upper_index:self.lower_index,trench_left:trench_right]
+            centre = self.trench_width/2
+            for file in ori_files[frame_start:frame_limit]:
+                im_t = pl.imread(file)
+                im_min = im_t.min()
+                im_max = im_t.max()
+                scaling_factor = (im_max - im_min)
+                im = (im_t - im_min)
+                im = (im * 255. / scaling_factor).astype(np.uint8)
+
+                trench_8bit = im[self.upper_index:self.lower_index,trench_left:trench_right]
+
+                intensity_scan = np.amax(trench_8bit, axis=0)
+
+                peak_loc = intensity_scan.argmax()
+                peak_shift = peak_loc-centre
+                trench = np.concatenate((trench, im_t[self.upper_index:self.lower_index, trench_left+peak_shift:trench_right+peak_shift]),axis=1)
+
+            out = PIL.Image.frombytes("I;16", (trench.shape[1], trench.shape[0]), trench.tobytes())
+            trench_name = self.pos_path + "/Kymographs/Lane_" + str(self.lane).zfill(2)  + "_pos_" + str(self.pos).zfill(3) + "_trench_" + str(i+1)+'.tiff'
+            out.save(trench_name)
 
 
-        # find the trenches in x
 
 
-
-
-
-
-
-
-
-
-        # return a list of box coordinates
-    #
-    # def fix_rotation(self):
-    #
-    #
-    # def kymograph(self, coordinates):
-    #     # cut each fov with the coordinates
-    #     # generate kymograph from it
 
 
 
@@ -398,7 +451,10 @@ class trench_kymograph():
 # test
 nd2_file = "HYSTERESIS_GC_COLLECTION_INOCULATION.nd2"
 file_directory = "/Volumes/Samsung_T3"
-new_kymo = trench_kymograph(nd2_file, file_directory, 1,'MCHERRY', 15)
+new_kymo = trench_kymograph(nd2_file, file_directory, 1,'MCHERRY', 15, 248, 14)
 new_kymo.get_trenches()
+new_kymo.kymograph()
+
 # new_extractor = ND2_extractor(nd2_file,file_directory)
+
 # new_extractor.run_extraction()
