@@ -2,7 +2,7 @@ import matplotlib
 
 # matplotlib.use('Agg')
 import matplotlib.pyplot as pl
-
+import itertools
 
 import re
 import glob    # pathname pattern
@@ -218,7 +218,7 @@ class trench_kymograph():
         files.sort(key=get_time)
 
 
-        # TODO find a beter way to superimpose data
+        # TODO   MAYBE... find a beter way to superimpose data
         # uniformly take n frames and superimpose them
         # tentative n 200?
         # n_frames = 200
@@ -238,15 +238,16 @@ class trench_kymograph():
 
 
         # for the sample data set, taking the first 50 frames
-        im = pl.imread(files[0])
-        if np.max(im) > 255:
-            im_min = im.min()
-            im_max = im.max()
-            scaling_factor = (im_max - im_min)
-            im = (im - im_min)
-            im = (im * 255. / scaling_factor).astype(np.uint8)
-        im_ave = im /50.0
-        for i in xrange(1, 50):
+        total_t = len(files)
+        if self.frame_start is None:
+            self.frame_start = 0
+        if self.frame_limit is None:
+            self.frame_limit = total_t
+
+
+
+        im_ave = 0
+        for i in xrange(self.frame_start, self.frame_limit):
             im_i    = pl.imread(files[i])
             if np.max(im_i) > 255:
                 im_min = im_i.min()
@@ -259,6 +260,60 @@ class trench_kymograph():
         im_ave = im_ave.astype(np.uint16)
         out = PIL.Image.frombytes("I;16", (im_ave.shape[1], im_ave.shape[0]), im_ave.tobytes())
         out.save(out_file)
+
+        # [height, width]=im.shape
+        # h_list = range(height)
+        # w_list = range(width)
+        # coord_list = list(itertools.product(h_list, w_list))
+        # int_list   = range(0,256)
+        # int_dict   = {intensity:0 for intensity in int_list}
+        # pix_int_dict = {pix_loc:int_dict for pix_loc in coord_list}
+        # # only consider 200 frames
+        # t_step = max(1, (self.frame_limit-self.frame_start) / 200)
+        #
+        # total_frame = len(range(self.frame_start-1, total_t, t_step))
+        # # print total_frame
+        #
+        # self.im_stack = np.zeros((total_frame,height,width))
+        # count = 0
+        # for i in xrange(self.frame_start, total_t, t_step):
+        #     im = pl.imread(files[i])
+        #     if np.max(im) > 255:
+        #         im_min = im.min()
+        #         im_max = im.max()
+        #         scaling_factor = (im_max - im_min)
+        #         im = (im - im_min)
+        #         im = (im * 255. / scaling_factor).astype(np.uint8)
+        #     self.im_stack[count] = im
+        #     count +=1
+        #     # print i
+        #
+        # self.int_perc = np.percentile(self.im_stack,80,axis=2)
+
+
+        # for i in xrange(self.frame_start, total_t+1, t_step):
+        #     im = pl.imread(files[self.frame_start])
+        #     if np.max(im) > 255:
+        #         im_min = im.min()
+        #         im_max = im.max()
+        #         scaling_factor = (im_max - im_min)
+        #         im = (im - im_min)
+        #         im = (im * 255. / scaling_factor).astype(np.uint8)
+        #     for idx_1, idx_2 in coord_list:
+        #         idx_int = im[idx_1,idx_2]
+        #         (pix_int_dict[(idx_1, idx_2)])[idx_int] +=1
+        #     print(i)
+        # self.dict = pix_int_dict
+        # # get the 80? percentile intensity at each pixel
+        # meta_pix_int = {pix_loc:0 for pix_loc in coord_list}
+        # for idx_1, idx_2 in coord_list:
+        #
+        #     count = 0
+        #     for key in sorted(pix_int_dict[(idx_1, idx_2)].iterkeys()):
+        #
+        # # return
+        #
+
 
         # intensity scanning to find the box containing each trench
 
@@ -291,9 +346,9 @@ class trench_kymograph():
 
         right_ind = peak_ind + self.trench_width/2
         self.ind_list = zip(left_ind, right_ind)
-        print(len(self.ind_list))
 
-    def kymograph(self, frame_start=None, frame_limit=None):
+
+    def kymograph(self):
         if not os.path.isdir(self.pos_path + '/Kymographs'):
             os.system('mkdir "' + self.pos_path + '/Kymographs"')
         ori_files = glob.glob(self.pos_path + '/*'+self.channel+'*')
@@ -309,9 +364,9 @@ class trench_kymograph():
         print(ori_files)
 
         # if no frame limit specified use all frames
-        if frame_start is None:
+        if self.frame_start is None:
             frame_start = 1
-        if frame_limit is None:
+        if self.frame_limit is None:
             frame_limit = len(ori_files)
         trench_num = len(self.ind_list)
 
@@ -453,8 +508,7 @@ nd2_file = "HYSTERESIS_GC_COLLECTION_INOCULATION.nd2"
 file_directory = "/Volumes/Samsung_T3"
 new_kymo = trench_kymograph(nd2_file, file_directory, 1,'MCHERRY', 15, 248, 14)
 new_kymo.get_trenches()
-new_kymo.kymograph()
+# new_kymo.kymograph()
 
 # new_extractor = ND2_extractor(nd2_file,file_directory)
-
 # new_extractor.run_extraction()
