@@ -283,9 +283,9 @@ class trench_kymograph():
     def kymograph(self,channel, lane, pos, frame_limit=None):
         pos_path = self.main_path + "/" + self.prefix + "/Lane_" + str(lane).zfill(2) + "/pos_" + str(pos).zfill(3)
         os.chdir(pos_path)
-        if not os.path.isdir(self.file_directory + '/Kymographs'):
-            os.system('mkdir "' + self.file_directory  + '/Kymographs"')
-        kymo_path = self.file_directory  + '/Kymographs'
+        kymo_path = self.file_directory + "/" + self.prefix + '/Kymographs' + '/Lane' + str(lane).zfill(2) + '/pos' + str(pos).zfill(3)
+        if not os.path.isdir(kymo_path):
+            os.system('mkdir ' + kymo_path)
         # if not os.path.isdir(pos_path + '/Kymographs'):
         #     os.system('mkdir "' + pos_path + '/Kymographs"')
         ori_files = glob.glob(pos_path + '/*' + channel + '*')
@@ -379,7 +379,7 @@ class trench_kymograph():
             out = PIL.Image.frombytes("I;16", (this_kymo.shape[1], this_kymo.shape[0]), this_kymo.tobytes())
             trench_name = kymo_path + "Channel_" + channel + "_Lane_" + str(lane).zfill(
                 2) + "_pos_" + str(
-                pos).zfill(3) + "_trench_" + str(i + 1) + '.tiff'
+                pos).zfill(3) + "_trench_" + str(i + 1).zfill(2) + '.tiff'
             out.save(trench_name)
 
     # from Sadik
