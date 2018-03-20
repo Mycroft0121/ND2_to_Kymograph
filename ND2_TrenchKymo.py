@@ -1,3 +1,10 @@
+# 20180318
+# ND2 extractor, Kymograph generator
+# author: Suyang Wan
+# product manager: Emanuele Leoncini
+# Special thanks for technical support: Sadik Yidik
+
+
 import matplotlib
 
 # matplotlib.use('Agg')
@@ -32,7 +39,7 @@ import multiprocessing
 from datetime import datetime
 import h5py
 import cv2
-
+from functools import partial
 
 # step 1, extract ND2 as usual
 class ND2_extractor():
@@ -171,34 +178,32 @@ class ND2_extractor():
         print('Time elapsed for extraction (hh:mm:ss.ms) {}'.format(time_elapsed))
 
 
-        # TODO
-        # return # of lanes, fov, channels
-
-
 #############
 # will use a lot from Sadik's code
 class trench_kymograph():
-    def __init__(self, nd2_file, file_directory, lane, info_channel, kymo_channels, pos, trench_length, trench_width,
+    def __init__(self, nd2_file, file_directory, lane_list, pos_list,info_channel, kymo_channels,  trench_length, trench_width,
                  frame_start=None, frame_limit=None):
+        self.prefix = nd2_file[:-4]
         self.main_path = file_directory
-        self.lane = lane
+        self.lane_list = lane_list
         self.info_channel = info_channel
         self.kymo_channel = kymo_channels
-        self.pos = pos
+        self.pos_list = pos_list
         self.frame_limit = frame_limit
-        self.pos_path = file_directory + "/" + nd2_file[:-4] + "/Lane_" + str(lane).zfill(2) + "/pos_" + str(pos).zfill(
-            3)
+        # self.pos_path = file_directory + "/" + nd2_file[:-4] + "/Lane_" + str(lane).zfill(2) + "/pos_" + str(pos).zfill(
+        #     3)
         self.trench_length = trench_length
         self.trench_width = trench_width
         self.frame_start = frame_start
         self.meta = None
 
     # generate stacks for each fov, find the max intensity
-    def get_trenches(self):
+    def get_trenches(self, lane, pos):
         # get the target files
-        self.channel = self.info_channel
-        os.chdir(self.pos_path)
-        files = glob.glob(self.pos_path + '/*' + self.channel + '.tiff')
+        # self.channel = self.info_channel
+        pos_path = file_directory + "/" + self.prefix  + "/Lane_" + str(lane).zfill(2) + "/pos_" + str(pos).zfill(3)
+        os.chdir(pos_path)
+        files = glob.glob(pos_path + '/*' + self.info_channel + '.tiff')
 
         # a helper function
         # sort files by time
@@ -216,7 +221,6 @@ class trench_kymograph():
             self.frame_start = 0
         if self.frame_limit is None:
             self.frame_limit = min(50, total_t)
-        # print(total_t)
         im = pl.imread(files[0])
         [height, width] = im.shape
 
@@ -238,12 +242,12 @@ class trench_kymograph():
         max_im = max_im.astype(np.uint16)
         out = PIL.Image.frombytes("I;16", (width, height), max_im.tobytes())
         out.save(out_file)
-        self.meta = max_im.astype(np.uint8)
+        meta = max_im.astype(np.uint8)
 
         # intensity scanning to find the box containing each trench
 
         # find the rough upper bound with horizontal intensity profile
-        intensity_scan = self.meta.sum(axis=1)
+        intensity_scan = meta.sum(axis=1)
         intensity_scan = intensity_scan / float(sum(intensity_scan))
         exp_int = np.exp(intensity_scan) - 1
         exp_int -= min(exp_int)
@@ -252,11 +256,11 @@ class trench_kymograph():
         # take the ratio of intensity/max_intensity and regard any pixel
         # lower than 14% of the max as non cells
         max_ratio = sub_intensity / sub_intensity[-1]
-        self.upper_index = np.where(max_ratio > 0.12)[0][0] - 20
-        self.lower_index = int(self.upper_index + self.trench_length * 0.8)
+        upper_index = np.where(max_ratio > 0.12)[0][0] - 20
+        lower_index = int(upper_index + self.trench_length * 0.8)
 
         # crop image with upper & lower indices
-        im_trenches = self.meta[self.upper_index:self.lower_index]
+        im_trenches = meta[upper_index:lower_index]
         # print(im_trenches.shape)
         # convert to 8-bit, using the imageJ way
         im_min = im_trenches.min()
@@ -269,32 +273,39 @@ class trench_kymograph():
         left_ind = peak_ind - int(self.trench_width / 2)
 
         right_ind = peak_ind + int(self.trench_width / 2)
-        self.ind_list = list(zip(left_ind, right_ind))
-        self.ind_list = np.array(self.ind_list)
+        ind_list = list(zip(left_ind, right_ind))
+        ind_list = np.array(ind_list)
         hf = h5py.File('box_info.h5', 'w')
-        hf.create_dataset('box', data=self.ind_list)
-        hf.create_dataset('upper_index', data=self.upper_index)
-        hf.create_dataset('lower_index', data=self.upper_index + self.trench_length)
+        hf.create_dataset('box', data=ind_list)
+        hf.create_dataset('upper_index', data=upper_index)
+        hf.create_dataset('lower_index', data=upper_index + self.trench_length)
+        hf.close()
+        # return meta, upper_index, lower_index,ind_list
+
+    def kymograph(self,channel, lane, pos, frame_limit=None):
+        pos_path = file_directory + "/" + self.prefix + "/Lane_" + str(lane).zfill(2) + "/pos_" + str(pos).zfill(3)
+        os.chdir(pos_path)
+        if not os.path.isdir(pos_path + '/Kymographs'):
+            os.system('mkdir "' + pos_path + '/Kymographs"')
+        ori_files = glob.glob(pos_path + '/*' + channel + '*')
+        box_info = "box_info.h5"
+
+        if not os.path.isfile(box_info):
+            self.get_trenches(lane, pos)
+
+        hf = h5py.File(box_info, 'r')
+        ind_list = hf.get('box').value
+        upper_index = hf.get('upper_index').value
+        lower_index = hf.get('lower_index').value
         hf.close()
 
-    def kymograph(self, channel, box_info=None, frame_limit=None):
-        if not os.path.isdir(self.pos_path + '/Kymographs'):
-            os.system('mkdir "' + self.pos_path + '/Kymographs"')
-        ori_files = glob.glob(self.pos_path + '/*' + channel + '*')
-        if box_info:
-            hf = h5py.File(box_info, 'r')
-            self.ind_list = hf.get('box').value
-            self.upper_index = hf.get('upper_index').value
-            self.lower_index = hf.get('lower_index').value
-            hf.close()
 
-        if type(self.meta) == None:
-            self.meta = pl.imread("frame_max_50.tiff")
-            im_min = self.meta.min()
-            im_max = self.meta.max()
-            scaling_factor = (im_max - im_min)
-            self.meta = (self.meta - im_min)
-            self.meta = (self.meta * 255. / scaling_factor).astype(np.uint8)
+        meta = pl.imread("frame_max_50.tiff")
+        im_min = meta.min()
+        im_max = meta.max()
+        scaling_factor = (im_max - im_min)
+        meta = (meta - im_min)
+        meta = (meta * 255. / scaling_factor).astype(np.uint8)
 
 
         # a helper function
@@ -313,9 +324,9 @@ class trench_kymograph():
         if frame_limit is None:
             self.frame_limit = self.total_t
 
-        trench_num = len(self.ind_list)
+        trench_num = len(ind_list)
 
-        self.lower_index = self.upper_index + self.trench_length
+        lower_index = upper_index + self.trench_length
 
         all_kymo = {}
         for i in range(trench_num):
@@ -333,7 +344,7 @@ class trench_kymograph():
             im = (im * 255. / scaling_factor).astype(np.uint8)
             # template matching
 
-            tl, br = self.matchTemplate(im)
+            tl, br = self.matchTemplate(im, meta)
             if f_i == self.frame_start:
                 ref_br = br
             else:
@@ -344,12 +355,8 @@ class trench_kymograph():
                 im_t = self.moveImage(im_t, move_x, move_y, pad=0)
 
             for i in range(trench_num):
-                trench_left, trench_right = self.ind_list[i]
-                # trench_8bit = im[self.upper_index:self.lower_index, trench_left:trench_right]
-                # intensity_scan = np.amax(trench_8bit, axis=0)
-                # peak_loc = intensity_scan.argmax()
-                # peak_shift = int(peak_loc - centre)
-                trench = im_t[self.upper_index:self.lower_index, max(0, trench_left):trench_right]
+                trench_left, trench_right = ind_list[i]
+                trench = im_t[upper_index:lower_index, max(0, trench_left):trench_right]
 
                 # correct for the first trench at edge
                 if i == 0:
@@ -369,25 +376,25 @@ class trench_kymograph():
             this_kymo = np.concatenate(all_kymo[i], axis=1).astype(np.uint16)
             all_kymo[i] = None
             out = PIL.Image.frombytes("I;16", (this_kymo.shape[1], this_kymo.shape[0]), this_kymo.tobytes())
-            trench_name = self.pos_path + "/Kymographs/Channel_" + channel + "_Lane_" + str(self.lane).zfill(
+            trench_name = pos_path + "/Kymographs/Channel_" + channel + "_Lane_" + str(lane).zfill(
                 2) + "_pos_" + str(
-                self.pos).zfill(3) + "_trench_" + str(i + 1) + '.tiff'
+                pos).zfill(3) + "_trench_" + str(i + 1) + '.tiff'
             out.save(trench_name)
 
     # from Sadik
-    def matchTemplate(self, img):
+    def matchTemplate(self, img, meta):
         """
         Takes an image and a template to search for and returns bottom right
         and top left coordinates. (top_left,bottom_right) ((int,int),(int,int))
         """
-        w, h = self.meta.shape[::-1]
+        w, h = meta.shape[::-1]
         # w, h = template.shape[::-1]
 
         # methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR','cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
         method = cv2.TM_CCOEFF
 
         # Apply template Matching
-        self.res = cv2.matchTemplate(img, self.meta, method)
+        self.res = cv2.matchTemplate(img, meta, method)
         min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(self.res)
 
         # If the method is TM_SQDIFF or TM_SQDIFF_NORMED, take minimum
@@ -429,12 +436,16 @@ class trench_kymograph():
         # openCV template matching
 
     def run_kymo(self):
+        def run_helper(arg):
+            return self.kymograph(*arg)
         for c in self.kymo_channel:
-            if c == self.info_channel:
-                self.get_trenches()
-                self.kymograph(c)
-            else:
-                self.kymograph(c, box_info='box_info.h5')
+             for l in self.lane_list:
+                 # poses = self.pos_list
+                 cores = pathos.multiprocessing.cpu_count()
+                 pool = pathos.multiprocessing.Pool(cores)
+                 arg  = [[c],[l],self.pos_list]
+                 pool.map(self.tiff_extractor, itertools.product(*arg))
+
 
     @staticmethod
     def moveImage(im, move_x, move_y, pad=0):
@@ -571,37 +582,23 @@ class trench_kymograph():
 ###############
 # test
 if __name__ == "__main__":
-    nd2_file = "NDL88_3Lane_RL5850_2Lane_8uMIPTG_DATA.nd2"
-    file_directory = r"Z:\Somenath\DATA_Ti3\20180313\DATA"
-    # lane, channel, pos, trench_length, trench_width
-    # new_kymo = trench_kymograph(nd2_file, file_directory, 1,'GFP', 2, 526, 20)
-    # os.chdir(r"Z:\Somenath\DATA_Ti3\20180313\DATA\NDL88_3Lane_RL5850_2Lane_8uMIPTG_DATA\Lane_01\pos_002")
-    # new_kymo.get_trenches()
+    nd2_file = "images.nd2"
+    file_directory = r"/Volumes/Seagate Backup Plus Drive/20161220--GC--SUBTILIS/Subtilis_GC"
+    lanes = range(1, 2)
+    poses = range(1, 31)
+    info_channel = '-r'
+    kymo_channels = ['-r', '-g']
 
-    # (self, nd2_file, file_directory, lane, info_channel,kymo_channels, pos, trench_length, trench_width, frame_start=None, frame_limit = None):
-    # new_kymo.kymograph('GFP','box_info.h5')
-    lanes = range(1, 6)
-    poses = range(1, 38)
-    info_channel = 'GFP'
-    kymo_channels = ['GFP', 'RFP']
-
-    trench_length = 526
-    trench_width = 20
-
-    for lane in lanes:
-        for pos in poses:
-            start_t = datetime.now()
-            new_kymo = trench_kymograph(nd2_file, file_directory, lane, info_channel, kymo_channels, pos, trench_length,
-                         trench_width)
-            new_kymo.run_kymo()
-            time_elapsed = datetime.now() - start_t
-            print('Time elapsed for extraction (hh:mm:ss.ms) {}'.format(time_elapsed))
-    # new_extractor = ND2_extractor(nd2_file,file_directory)
-    # new_extractor.run_extraction()
-    # parallelization of extraction part
-    # new_kymo = trench_kymograph(nd2_file, file_directory, 1, info_channel, kymo_channels, 7, trench_length,
-    #                             trench_width)
+    trench_length = 330
+    trench_width = 18
 
 
+    start_t = datetime.now()
+    print('Kymo starts ')
+    new_kymo = trench_kymograph( nd2_file, file_directory, lanes, poses, info_channel, kymo_channels, trench_length,
+                 trench_width)
+    new_kymo.run_kymo()
+    time_elapsed = datetime.now() - start_t
+    print('Time elapsed for extraction (hh:mm:ss.ms) {}'.format(time_elapsed))
 
 
