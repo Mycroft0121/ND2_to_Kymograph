@@ -190,8 +190,6 @@ class trench_kymograph():
         self.kymo_channel = kymo_channels
         self.pos_list = pos_list
         self.frame_limit = frame_limit
-        # self.pos_path = file_directory + "/" + nd2_file[:-4] + "/Lane_" + str(lane).zfill(2) + "/pos_" + str(pos).zfill(
-        #     3)
         self.trench_length = trench_length
         self.trench_width = trench_width
         self.frame_start = frame_start
@@ -201,7 +199,7 @@ class trench_kymograph():
     def get_trenches(self, lane, pos):
         # get the target files
         # self.channel = self.info_channel
-        pos_path = file_directory + "/" + self.prefix  + "/Lane_" + str(lane).zfill(2) + "/pos_" + str(pos).zfill(3)
+        pos_path = self.main_path + "/" + self.prefix  + "/Lane_" + str(lane).zfill(2) + "/pos_" + str(pos).zfill(3)
         os.chdir(pos_path)
         files = glob.glob(pos_path + '/*' + self.info_channel + '.tiff')
 
@@ -283,7 +281,7 @@ class trench_kymograph():
         # return meta, upper_index, lower_index,ind_list
 
     def kymograph(self,channel, lane, pos, frame_limit=None):
-        pos_path = file_directory + "/" + self.prefix + "/Lane_" + str(lane).zfill(2) + "/pos_" + str(pos).zfill(3)
+        pos_path = self.main_path + "/" + self.prefix + "/Lane_" + str(lane).zfill(2) + "/pos_" + str(pos).zfill(3)
         os.chdir(pos_path)
         if not os.path.isdir(pos_path + '/Kymographs'):
             os.system('mkdir "' + pos_path + '/Kymographs"')
@@ -440,11 +438,11 @@ class trench_kymograph():
             return self.kymograph(*arg)
         for c in self.kymo_channel:
              for l in self.lane_list:
-                 # poses = self.pos_list
                  cores = pathos.multiprocessing.cpu_count()
                  pool = pathos.multiprocessing.Pool(cores)
                  arg  = [[c],[l],self.pos_list]
-                 pool.map(self.tiff_extractor, itertools.product(*arg))
+                 arg_list = list(itertools.product(*arg))
+                 pool.map(run_helper, arg_list)
 
 
     @staticmethod
