@@ -4,8 +4,8 @@
 # product manager: Emanuele Leoncini
 # Special thanks for technical support: Sadik Yidik
 
+# Todo: create a GUI
 
-# todo: fix extractor xml file problem
 
 import matplotlib.pyplot as pl
 import itertools
@@ -30,6 +30,8 @@ import h5py
 import cv2
 import operator
 
+
+# todo: fix extractor xml file problem
 # step 1, extract ND2 as usual
 class ND2_extractor():
     def __init__(self, nd2_file, file_directory, xml_file=None, xml_dir=None, output_path=None):
@@ -168,6 +170,10 @@ class ND2_extractor():
 
 
 #############
+
+# todo: deal with trenches at bottom
+# todo: incorporate Sadik's BF channel
+# todo: rotation correction
 # will use a lot from Sadik's code
 class trench_kymograph():
     def __init__(self, nd2_file, file_directory, lane_list, pos_list,info_channel, kymo_channels,  trench_length, trench_width,
