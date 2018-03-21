@@ -5,9 +5,7 @@
 # Special thanks for technical support: Sadik Yidik
 
 
-
-# TODO: deal with if not success in open files
-# TODO: Solve ValueError: zero-size array to reduction operation minimum which has no identity
+# todo: fix extractor xml file problem
 
 import matplotlib.pyplot as pl
 import itertools
