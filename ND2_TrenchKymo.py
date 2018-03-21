@@ -32,6 +32,7 @@ import operator
 
 
 # todo: fix extractor xml file problem
+# todo: new class for segmentation & lineage tracking
 # step 1, extract ND2 as usual
 class ND2_extractor():
     def __init__(self, nd2_file, file_directory, xml_file=None, xml_dir=None, output_path=None):
@@ -174,6 +175,7 @@ class ND2_extractor():
 # todo: deal with trenches at bottom
 # todo: incorporate Sadik's BF channel
 # todo: rotation correction
+
 # will use a lot from Sadik's code
 class trench_kymograph():
     def __init__(self, nd2_file, file_directory, lane_list, pos_list,info_channel, kymo_channels,  trench_length, trench_width,
@@ -353,46 +355,65 @@ class trench_kymograph():
 
         all_kymo = {}
         if trench_num > 0:
-            for i in range(trench_num):
-                all_kymo[i] = np.zeros((self.total_t, self.trench_length, self.trench_width))
-            file_list = ori_files[self.frame_start:self.frame_limit]
 
+            lower_index = upper_index + self.trench_length + 20
+
+            all_kymo = {}
+            for i in range(trench_num):
+                all_kymo[i] = np.zeros((self.total_t, self.trench_length+20, self.trench_width))
+            file_list = ori_files[self.frame_start:self.frame_limit]
             for f_i in range(len(file_list)):
-                file = file_list[f_i]
-                if pl.imread(file):
+                try:
+                    file = file_list[f_i]
+
                     im_t = pl.imread(file)
                     im_min = im_t.min()
                     im_max = im_t.max()
                     scaling_factor = (im_max - im_min)
                     im = (im_t - im_min)
                     im = (im * 255. / scaling_factor).astype(np.uint8)
-                    # template matching
 
+                    # template matching
                     tl, br = self.matchTemplate(im, meta)
                     if f_i == self.frame_start:
                         ref_br = br
                     else:
                         move_x = ref_br[1] - br[1]
                         move_y = ref_br[0] - br[0]
-                        # print(files[i-1].split('/')[-1],tl,br,move_x,move_y)
-                        # imc = self.moveImage(imc, move_x, move_y)
                         im_t = self.moveImage(im_t, move_x, move_y, pad=0)
 
                     for i in range(trench_num):
                         trench_left, trench_right = ind_list[i]
                         trench = im_t[upper_index:lower_index, max(0, trench_left):trench_right]
-                        all_kymo[i][f_i] = trench.astype(np.uint16)
 
-            for i in range(trench_num):
-                this_kymo = np.concatenate(all_kymo[i], axis=1).astype(np.uint16)
-                all_kymo[i] = None
-                out = PIL.Image.frombytes("I;16", (this_kymo.shape[1], this_kymo.shape[0]), this_kymo.tobytes())
-                trench_name = kymo_path + "Channel_" + channel + "_Lane_" + str(lane).zfill(
-                    2) + "_pos_" + str(
-                    pos).zfill(3) + "_trench_" + str(i + 1).zfill(2) + '.tiff'
-                out.save(trench_name)
+                        # # correct for the first trench at edge
+                        # if i == 0:
+                        #     if trench.shape[1] < trench_width:
+                        #         pad = np.zeros((trench_length, trench_width - trench.shape[1]))
+                        #         trench = np.concatenate((pad, trench), axis=1).astype(np.uint16)
+                        #
+                        # # correct for the last trench at edge
+                        # elif i == trench_num - 1:
+                        #     if trench.shape[1] < trench_width:
+                        #         pad = np.zeros((trench_length, trench_width - trench.shape[1]))
+                        #         trench = np.concatenate((trench, pad), axis=1).astype(np.uint16)
+                        all_kymo[i][f_i] = trench.astype(np.uint16)
+                except:
+                    print("something is wrong")
+                    pass
+
+                for i in range(trench_num):
+                    this_kymo = np.concatenate(all_kymo[i], axis=1).astype(np.uint16)
+                    all_kymo[i] = None
+                    out = PIL.Image.frombytes("I;16", (this_kymo.shape[1], this_kymo.shape[0]), this_kymo.tobytes())
+                    trench_name = kymo_path + "/Channel_" + channel + "_Lane_" + str(lane).zfill(2) + "_pos_" + str(
+                        pos).zfill(3) + "_trench_" + str(i + 1).zfill(2) + '.tiff'
+                    out.save(trench_name)
         else:
-            print("No trenches detected")
+            print("no trenches detected")
+
+
+
 
     # from Sadik
     def matchTemplate(self, img, meta):
