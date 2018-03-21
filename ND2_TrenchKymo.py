@@ -5,41 +5,32 @@
 # Special thanks for technical support: Sadik Yidik
 
 
-import matplotlib
 
-# matplotlib.use('Agg')
+# TODO: deal with if not success in open files
+# TODO: Solve ValueError: zero-size array to reduction operation minimum which has no identity
+
 import matplotlib.pyplot as pl
 import itertools
-
-import re
 import glob  # pathname pattern
-import os
-from PIL import Image
-import math
 
-from scipy.signal import medfilt, argrelextrema
-from scipy.misc import toimage
-from scipy.stats import mode
-from scipy import ndimage as ndi
-from scipy.ndimage.morphology import distance_transform_edt
+from PIL import Image
+
 
 # from ND2 extractor
 
 import nd2reader
 import os
-import shutil
+
 import PIL
 import numpy as np
 from pims import ND2_Reader
-import functools
 import xml.etree.cElementTree as ET
 import re
 import pathos.multiprocessing
-import multiprocessing
 from datetime import datetime
 import h5py
 import cv2
-from functools import partial
+import operator
 
 # step 1, extract ND2 as usual
 class ND2_extractor():
@@ -183,6 +174,7 @@ class ND2_extractor():
 class trench_kymograph():
     def __init__(self, nd2_file, file_directory, lane_list, pos_list,info_channel, kymo_channels,  trench_length, trench_width,
                  frame_start=None, frame_limit=None):
+        self.file_directory = file_directory
         self.prefix = nd2_file[:-4]
         self.main_path = file_directory
         self.lane_list = lane_list
@@ -222,7 +214,8 @@ class trench_kymograph():
         im = pl.imread(files[0])
         [height, width] = im.shape
 
-        max_im = np.zeros((height, width))
+
+        im_stack = np.zeros((self.frame_limit-self.frame_start, height,width))
 
         for i in range(self.frame_start, self.frame_limit):
             im_i = pl.imread(files[i])
@@ -233,43 +226,65 @@ class trench_kymograph():
                 im_i = (im_i - im_min)
                 im_i = (im_i * 255. / scaling_factor).astype(np.uint8)
                 im_i = np.array(im_i)
-            im_concat = np.stack((max_im, im_i))
-            max_im = np.max(im_concat, axis=0)
+            im_stack[i] = im_i
+
+        perc = np.percentile(im_stack,85,axis = 0).astype(np.uint8)
+        max_im = perc
+
+
 
         out_file = "frame_max_50.tiff"
-        max_im = max_im.astype(np.uint16)
-        out = PIL.Image.frombytes("I;16", (width, height), max_im.tobytes())
+        # convert to 8-bit, using the imageJ way
+        im_min = max_im.min()
+        im_max = max_im.max()
+        scaling_factor = (im_max - im_min)
+        max_im = (max_im - im_min)
+        max_im = (max_im * 255. / scaling_factor).astype(np.uint8)
+        out = PIL.Image.frombytes("L", (width, height), max_im.tobytes())
         out.save(out_file)
-        meta = max_im.astype(np.uint8)
+        meta = max_im
 
-        # intensity scanning to find the box containing each trench
 
-        # find the rough upper bound with horizontal intensity profile
-        intensity_scan = meta.sum(axis=1)
+        # improvement
+
+        # identify trench first
+        im_trenches = meta[:height - trench_length]
+        intensity_scan = np.amax(im_trenches, axis=0)
+        peak_ind = self.detect_peaks(intensity_scan, mph=50, mpd=trench_length)
+        if peak_ind[0] < (trench_length / 2):
+            peak_ind = peak_ind[1:]
+        if (width - peak_ind[-1]) < (trench_length / 2):
+            peak_ind = peak_ind[:-1]
+
+        trenches = np.zeros((len(peak_ind), height - trench_length, trench_width))
+        for i in range(len(peak_ind)):
+            left = int(peak_ind[i] - trench_width / 2)
+            right = int(peak_ind[i] + trench_width / 2)
+            trenches[i] = meta[:height - trench_length, left:right]
+        trenches = np.concatenate(trenches, axis=1)
+        intensity_scan = trenches.sum(axis=1)
+        intensity_scan = intensity_scan
         intensity_scan = intensity_scan / float(sum(intensity_scan))
-        exp_int = np.exp(intensity_scan) - 1
-        exp_int -= min(exp_int)
-        peak_ind = np.argmax(exp_int)
-        sub_intensity = exp_int[:peak_ind]
-        # take the ratio of intensity/max_intensity and regard any pixel
-        # lower than 14% of the max as non cells
-        max_ratio = sub_intensity / sub_intensity[-1]
-        upper_index = np.where(max_ratio > 0.12)[0][0] - 20
-        lower_index = int(upper_index + self.trench_length * 0.8)
+        diff = map(operator.sub, intensity_scan[1:], intensity_scan[:-1])
+        diff = np.array(map(abs, diff))
+        peak_ind = self.detect_peaks(diff)
+        peak_val = diff[peak_ind]
+        top_ind = np.argmax(peak_val)
+        top = peak_ind[top_ind]
+
+        upper_index = top - 20
+        lower_index = int(upper_index + self.trench_length * 0.5)
 
         # crop image with upper & lower indices
         im_trenches = meta[upper_index:lower_index]
-        # print(im_trenches.shape)
-        # convert to 8-bit, using the imageJ way
-        im_min = im_trenches.min()
-        im_max = im_trenches.max()
-        scaling_factor = (im_max - im_min)
-        im_trenches = (im_trenches - im_min)
-        im_trenches = (im_trenches * 255. / scaling_factor).astype(np.uint8)
-        intensity_scan = np.amax(im_trenches, axis=0)
-        peak_ind = self.detect_peaks(intensity_scan, mph=45, mpd=self.trench_width)
-        left_ind = peak_ind - int(self.trench_width / 2)
 
+        intensity_scan = np.amax(im_trenches, axis=0)
+        peak_ind = self.detect_peaks(intensity_scan, mph=50, mpd=self.trench_width)
+        if peak_ind[0] < (self.trench_length/2):
+            peak_ind = peak_ind[1:]
+        if (width-peak_ind[-1]) < (self.trench_length/2):
+            peak_ind = peak_ind[:-1]
+        left_ind = peak_ind - int(self.trench_width / 2)
         right_ind = peak_ind + int(self.trench_width / 2)
         ind_list = list(zip(left_ind, right_ind))
         ind_list = np.array(ind_list)
@@ -278,16 +293,20 @@ class trench_kymograph():
         hf.create_dataset('upper_index', data=upper_index)
         hf.create_dataset('lower_index', data=upper_index + self.trench_length)
         hf.close()
-        # return meta, upper_index, lower_index,ind_list
+
 
     def kymograph(self,channel, lane, pos, frame_limit=None):
-        pos_path = self.main_path + "/" + self.prefix + "/Lane_" + str(lane).zfill(2) + "/pos_" + str(pos).zfill(3)
+        pos_path = self.file_directory + "/" + self.prefix + "/Lane_" + str(lane).zfill(2) + "/pos_" + str(pos).zfill(3)
         os.chdir(pos_path)
-        kymo_path = self.file_directory + "/" + self.prefix + '/Kymographs' + '/Lane' + str(lane).zfill(2) + '/pos' + str(pos).zfill(3)
+        kymo_path = self.file_directory + "/" + self.prefix + '/Kymographs/'
         if not os.path.isdir(kymo_path):
             os.system('mkdir ' + kymo_path)
-        # if not os.path.isdir(pos_path + '/Kymographs'):
-        #     os.system('mkdir "' + pos_path + '/Kymographs"')
+        kymo_path = kymo_path + 'Lane' + str(lane).zfill(2)
+        if not os.path.isdir(kymo_path):
+            os.system('mkdir ' + kymo_path)
+        kymo_path = kymo_path + '/pos' + str(pos).zfill(3)
+        if not os.path.isdir(kymo_path):
+            os.system('mkdir ' + kymo_path)
         ori_files = glob.glob(pos_path + '/*' + channel + '*')
         box_info = "box_info.h5"
 
@@ -297,7 +316,6 @@ class trench_kymograph():
         hf = h5py.File(box_info, 'r')
         ind_list = hf.get('box').value
         upper_index = hf.get('upper_index').value
-        lower_index = hf.get('lower_index').value
         hf.close()
 
 
@@ -330,57 +348,47 @@ class trench_kymograph():
         lower_index = upper_index + self.trench_length
 
         all_kymo = {}
-        for i in range(trench_num):
-            all_kymo[i] = np.zeros((self.total_t, self.trench_length, self.trench_width))
-        file_list = ori_files[self.frame_start:self.frame_limit]
+        if trench_num > 0:
+            for i in range(trench_num):
+                all_kymo[i] = np.zeros((self.total_t, self.trench_length, self.trench_width))
+            file_list = ori_files[self.frame_start:self.frame_limit]
 
-        for f_i in range(len(file_list)):
-            file = file_list[f_i]
-            im_t = pl.imread(file)
-            im_t = pl.imread(file)
-            im_min = im_t.min()
-            im_max = im_t.max()
-            scaling_factor = (im_max - im_min)
-            im = (im_t - im_min)
-            im = (im * 255. / scaling_factor).astype(np.uint8)
-            # template matching
+            for f_i in range(len(file_list)):
+                file = file_list[f_i]
+                if pl.imread(file):
+                    im_t = pl.imread(file)
+                    im_min = im_t.min()
+                    im_max = im_t.max()
+                    scaling_factor = (im_max - im_min)
+                    im = (im_t - im_min)
+                    im = (im * 255. / scaling_factor).astype(np.uint8)
+                    # template matching
 
-            tl, br = self.matchTemplate(im, meta)
-            if f_i == self.frame_start:
-                ref_br = br
-            else:
-                move_x = ref_br[1] - br[1]
-                move_y = ref_br[0] - br[0]
-                # print(files[i-1].split('/')[-1],tl,br,move_x,move_y)
-                # imc = self.moveImage(imc, move_x, move_y)
-                im_t = self.moveImage(im_t, move_x, move_y, pad=0)
+                    tl, br = self.matchTemplate(im, meta)
+                    if f_i == self.frame_start:
+                        ref_br = br
+                    else:
+                        move_x = ref_br[1] - br[1]
+                        move_y = ref_br[0] - br[0]
+                        # print(files[i-1].split('/')[-1],tl,br,move_x,move_y)
+                        # imc = self.moveImage(imc, move_x, move_y)
+                        im_t = self.moveImage(im_t, move_x, move_y, pad=0)
+
+                    for i in range(trench_num):
+                        trench_left, trench_right = ind_list[i]
+                        trench = im_t[upper_index:lower_index, max(0, trench_left):trench_right]
+                        all_kymo[i][f_i] = trench.astype(np.uint16)
 
             for i in range(trench_num):
-                trench_left, trench_right = ind_list[i]
-                trench = im_t[upper_index:lower_index, max(0, trench_left):trench_right]
-
-                # correct for the first trench at edge
-                if i == 0:
-                    if trench.shape[1] < trench_width:
-                        pad = np.zeros((trench_length, trench_width - trench.shape[1]))
-                        trench = np.concatenate((pad, trench), axis=1).astype(np.uint16)
-
-                # correct for the last trench at edge
-                elif i == trench_num - 1:
-                    if trench.shape[1] < trench_width:
-                        pad = np.zeros((trench_length, trench_width - trench.shape[1]))
-                        trench = np.concatenate((trench, pad), axis=1).astype(np.uint16)
-                all_kymo[i][f_i] = trench.astype(np.uint16)
-
-
-        for i in range(trench_num):
-            this_kymo = np.concatenate(all_kymo[i], axis=1).astype(np.uint16)
-            all_kymo[i] = None
-            out = PIL.Image.frombytes("I;16", (this_kymo.shape[1], this_kymo.shape[0]), this_kymo.tobytes())
-            trench_name = kymo_path + "Channel_" + channel + "_Lane_" + str(lane).zfill(
-                2) + "_pos_" + str(
-                pos).zfill(3) + "_trench_" + str(i + 1).zfill(2) + '.tiff'
-            out.save(trench_name)
+                this_kymo = np.concatenate(all_kymo[i], axis=1).astype(np.uint16)
+                all_kymo[i] = None
+                out = PIL.Image.frombytes("I;16", (this_kymo.shape[1], this_kymo.shape[0]), this_kymo.tobytes())
+                trench_name = kymo_path + "Channel_" + channel + "_Lane_" + str(lane).zfill(
+                    2) + "_pos_" + str(
+                    pos).zfill(3) + "_trench_" + str(i + 1).zfill(2) + '.tiff'
+                out.save(trench_name)
+        else:
+            print("No trenches detected")
 
     # from Sadik
     def matchTemplate(self, img, meta):
@@ -596,7 +604,7 @@ if __name__ == "__main__":
 
     start_t = datetime.now()
     print('Kymo starts ')
-    new_kymo = trench_kymograph( nd2_file, file_directory, lanes, poses, info_channel, kymo_channels, trench_length,
+    new_kymo = trench_kymograph(nd2_file, file_directory, lanes, poses, info_channel, kymo_channels, trench_length,
                  trench_width)
     new_kymo.run_kymo()
     time_elapsed = datetime.now() - start_t
