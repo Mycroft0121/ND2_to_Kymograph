@@ -183,9 +183,6 @@ class ND2_extractor():
 
 # todo: deal with trenches at bottom & one fov with 2 trenches
 # todo: incorporate Sadik's Phase Contrast channel
-
-
-# will use a lot from Sadik's code
 class trench_kymograph():
     def __init__(self, nd2_file, file_directory, lane_list, pos_list,info_channel, kymo_channels,  trench_length, trench_width,
                  frame_start=None, frame_limit=None):
