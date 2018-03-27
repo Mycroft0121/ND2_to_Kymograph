@@ -183,6 +183,8 @@ class ND2_extractor():
 
 # todo: deal with trenches at bottom & one fov with 2 trenches
 # todo: incorporate Sadik's Phase Contrast channel
+# todo: rotation correction for poor aligned chips
+# todo: trench identification with multiple channels
 class trench_kymograph():
     def __init__(self, nd2_file, file_directory, lane_list, pos_list,info_channel, kymo_channels,  trench_length, trench_width,
                  frame_start=None, frame_limit=None):
@@ -281,7 +283,7 @@ class trench_kymograph():
         for i in range(height):
             window = np.array(intensity_scan[i:i+len_thres])
 
-            if sum(window>int_thres) == int_thres:
+            if sum(window > int_thres) == int_thres:
                 top = i
                 break
 
@@ -609,7 +611,7 @@ class trench_kymograph():
 if __name__ == "__main__":
     nd2_file = "images.nd2"
     file_directory = r"/Volumes/Seagate Backup Plus Drive/20161220--GC--SUBTILIS/Subtilis_GC"
-    lanes = range(1, 2)
+    lanes = range(2,3)
     poses = range(1, 31)
     info_channel = '-r'
     kymo_channels = ['-r', '-g']
