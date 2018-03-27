@@ -279,10 +279,9 @@ class trench_kymograph():
         int_thres = 0.15
         len_thres = int(0.2*self.trench_length)
         for i in range(height):
-            window = intensity_scan[i:i+len_thres]
-            ave_int = sum(window)/(1.*len_thres)
-            print(ave_int)
-            if ave_int >= int_thres:
+            window = np.array(intensity_scan[i:i+len_thres])
+
+            if sum(window>int_thres) == int_thres:
                 top = i
                 break
 
@@ -398,6 +397,16 @@ class trench_kymograph():
                 out.save(trench_name)
         else:
             print("no trenches detected")
+
+
+    @staticmethod
+    def to_8_bit(im):
+        im_min = im.min()
+        im_max = im.max()
+        scaling_factor = (im_max - im_min)
+        im = (im - im_min)
+        im = (im * 255. / scaling_factor).astype(np.uint8)
+        return im
 
     # from Sadik
     def matchTemplate(self, img, meta):
@@ -593,14 +602,7 @@ class trench_kymograph():
 
         return ind
 
-    @staticmethod
-    def to_8_bit(im):
-        im_min = im.min()
-        im_max = im.max()
-        scaling_factor = (im_max - im_min)
-        im = (im - im_min)
-        im = (im * 255. / scaling_factor).astype(np.uint8)
-        return im
+
 
 ###############
 # test
