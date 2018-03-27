@@ -242,14 +242,14 @@ class trench_kymograph():
                 im_i = self.to_8_bit(im_i)
             im_stack[i] = im_i
         perc = np.percentile(im_stack,85,axis = 0).astype(np.uint8)
-        max_im = perc
+        # max_im = perc
         out_file = "perc_85_frame_50.tiff"
 
         # convert to 8-bit, using the imageJ way
-        max_im = self.to_8_bit(max_im)
-        out = PIL.Image.frombytes("L", (width, height), max_im.tobytes())
+        perc = self.to_8_bit(perc)
+        out = PIL.Image.frombytes("L", (width, height), perc.tobytes())
         out.save(out_file)
-        meta = max_im
+        meta = perc
 
         # improvement
 
@@ -269,7 +269,6 @@ class trench_kymograph():
             trenches[i] = meta[:height - trench_length, left:right]
         trenches = np.concatenate(trenches, axis=1)
 
-
         intensity_scan = trenches.sum(axis=1)
         intensity_scan = intensity_scan
         intensity_scan = intensity_scan / float(sum(intensity_scan))
@@ -280,14 +279,15 @@ class trench_kymograph():
         intensity_scan = (intensity_scan - im_min)
         intensity_scan = (intensity_scan / scaling_factor).astype(np.uint8)
 
-
-
-        diff = map(operator.sub, intensity_scan[1:], intensity_scan[:-1])
-        diff = np.array(map(abs, diff))
-        peak_ind = self.detect_peaks(diff)
-        peak_val = diff[peak_ind]
-        top_ind = np.argmax(peak_val)
-        top = peak_ind[top_ind]
+        int_thres = 0.15
+        len_thres = int(0.2*self.trench_length)
+        for i in range(height):
+            window = intensity_scan[i:i+len_thres]
+            ave_int = sum(window)/(1.*len_thres)
+            print(ave_int)
+            if ave_int >= int_thres:
+                top = i
+                break
 
         upper_index = top - 20
         lower_index = int(upper_index + self.trench_length * 0.5)
