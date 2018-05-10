@@ -138,16 +138,16 @@ def detect_peaks(x, mph=None, mpd=1, threshold=0, edge='both', kpsh=False, valle
 
 files.sort(key=get_time)
 # take the initial 20s
-files = files[0:20]
+files = files[0:50]
 
 y_top    = 732
 y_bottom = 868
 trench_width = 20
 peaks = {}
-print(len(files))
+# print(len(files))
 peak_ind = open('peak_ind.txt', 'w')
 for i in range(len(files)):
-    print i
+    # print i
     im_i = pl.imread(files[i])
     # crop the trench region
     im_trenches = im_i[y_top:y_bottom]
@@ -159,13 +159,79 @@ for i in range(len(files)):
     # file.write('\n'.join(str(year) for year in years))
     peak_ind.write(' '.join(str(p) for p in peak))
     peak_ind.write('\n')
-    print peak
+    # print peak
 
 peak_ind.close()
 
 
 # input: two lists of integers of similar size and values
 # goal
-def pairwise_list_align(list_A, list_B):
+# output: an integer indicating shift pixes (positive in right direction, negative in left)
+def pairwise_list_align(list_a, list_b):
+    shift = 0
+    matches = 0
+    i_a = 0
+    i_b = 0
+    # only consider middle
+    list_a = list_a[1:-1]
+    len_a = len(list_a)-2
+    len_b = len(list_b)
+    for x in list_a:
+        found = 0
+        while not found:
+            diff = list_b[i_b] - x
+            if diff< -trench_width:
+                i_b +=1
+            elif diff > trench_width: # this cell is lost
+                break
+            else:
+                found = 1
+                shift += diff
+                matches += 1
+    shift = shift*1./matches
+    # print shift
+    return shift
+
+shift = []
+for i in range(49):
+    list_a = peaks[i]
+    list_b = peaks[i+1]
+    shift.append(pairwise_list_align(list_a, list_b))
+
+
+
+shift= np.cumsum(np.array(shift)).astype(int)
+
+pad = 0
+for i in range(1,len(files)):
+    # print i
+    im_i = pl.imread(files[i])
+    s = shift[i-1]*-1
+    if s:
+        # im_new = moveImage(im_i, move_y, move_x, pad=0)
+        im_new = np.zeros((im_i.shape[0], im_i.shape[1]), dtype='int16')
+        # if s < 0:
+        #     xbound = -s
+        # else:
+        xbound = im_i.shape[1]
+
+
+        if s >= 0:
+            im_new[:,s:] = im_i[:,im_i.shape[1]-s]
+            im_new[:,0:s] = pad
+        else:
+            im_new[:,:xbound+s] = im_i[:,-s:]
+            im_new[:,xbound+s:] = pad
+    else:
+        im_new = im_i
+    # print(shift[i-1])
+    # print(im_i == im_new)
+
+    tiff_name = files[i].split('.tif')[0] + '_new_new.tif'
+    # image = im_new.base.astype(np.uint16)
+    out = PIL.Image.frombytes("I;16", (im_new.shape[1], im_new.shape[0]), im_new.tobytes())
+    out.save(tiff_name)
+
+
 
 
