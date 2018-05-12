@@ -715,7 +715,7 @@ if __name__ == "__main__":
     #              box_info=None):
 
     nd2_file = "20180505_Hysteresis_3min.nd2"
-    main_directory = r"/Volumes/SysBio/PAULSSON LAB/Juan/201800505_Hysteresis"
+    main_directory = r"/Volumes/SysBio/PAULSSON LAB/Juan/20180505_Hysteresis"
     lanes = [1]
     poses = range(1,69)
     seg_channel = 'RFP'
@@ -777,7 +777,7 @@ if __name__ == "__main__":
 
 
     nd2_file = "20180501_GrowthCurveandCollection.nd2"
-    main_directory = r"/Volumes/SysBio/PAULSSON LAB/Juan/201800501_Hysteresis"
+    main_directory = r"/Volumes/SysBio/PAULSSON LAB/Juan/20180501_Hysteresis"
     lanes = [1]
     poses = range(1,68)
     seg_channel = 'RFP'
