@@ -536,8 +536,8 @@ class trench_kymograph():
 
 
 
-                    kymo_stack = []
-                    kymo_stack = this_kymo.tolist()
+
+                    kymo_stack = all_kymo[t_i].tolist()
                     kymo_stack[0].save(trench_name_stack, compression="tiff_deflate", save_all=True,
                                    append_images=kymo_stack[1:])
 
@@ -738,7 +738,8 @@ if __name__ == "__main__":
     print('Kymo starts ')
 
     # drift correct for each lane:
-    for lane in lanes:
+    for lane in lanes
+        print("1")
         pos = poses[0]
         channel = seg_channel
         new_kymo = trench_kymograph(nd2_file, main_directory, lane, pos, channel, seg_channel, trench_length,
@@ -755,6 +756,7 @@ if __name__ == "__main__":
     # trench identify for each pos
     for lane in lanes:
         for pos in poses:
+            print("2")
             channel = seg_channel
             new_kymo = trench_kymograph(nd2_file, main_directory, lane, pos, channel, seg_channel,trench_length,
                                         trench_width,spatial,drift_correct,frame_start=1,find_correct=0)
@@ -763,6 +765,7 @@ if __name__ == "__main__":
 
     for lane in lanes:
         for pos in poses:
+            print("3")
             for channel in other_channels:
                 new_kymo = trench_kymograph(nd2_file, main_directory, lane, pos, channel, seg_channel,trench_length,
                                         trench_width,spatial,drift_correct,frame_start=1,find_correct=0)
