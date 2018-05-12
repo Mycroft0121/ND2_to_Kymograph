@@ -725,7 +725,7 @@ if __name__ == "__main__":
     nd2_file = "96wellplateBandFor8ROW.nd2"
     main_directory = r"/Volumes/SysBio/PAULSSON LAB/Juan/20180415_Hysteresis"
     lanes = [1]
-    poses = range(1, 10)
+    poses = range(10)
     seg_channel = 'MCHERRY'
     other_channels = ['BF', 'GFP']
     all_channel = ['MCHERRY','BF', 'GFP']
@@ -738,7 +738,7 @@ if __name__ == "__main__":
     print('Kymo starts ')
 
     # drift correct for each lane:
-    for lane in lanes
+    for lane in lanes:
         print("1")
         pos = poses[0]
         channel = seg_channel
