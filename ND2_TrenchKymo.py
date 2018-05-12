@@ -557,10 +557,10 @@ class trench_kymograph():
         if self.find_correct == 1:
             self.find_drift()
         else:
-            if self.channel == seg_channel:
-                self.get_trenches()
             if self.drift_correct == 1:
                 self.read_drift()
+            if self.channel == seg_channel:
+                self.get_trenches()
                 self.kymograph()
             else:
                 self.kymograph()
