@@ -514,18 +514,36 @@ class trench_kymograph():
                         all_kymo[t_i][f_i] = trench.astype(np.uint16)
 
                 for t_i in range(trench_num):
+
+
+
+
+                    if i == 0:
+                        trench_name = kymo_path + "/Lane_" + str(self.lane).zfill(
+                            2) + "_pos_" + str(
+                            self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(2) + "_top_c_"+ self.channel+".tiff"
+                        trench_name_stack = kymo_path + "/Stack_Lane_" + str(self.lane).zfill(
+                            2) + "_pos_" + str(
+                            self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(2) + "_top_c_" + self.channel + ".tiff"
+                    else:
+                        trench_name = kymo_path + "/Lane_" + str(self.lane).zfill(
+                            2) + "_pos_" + str(
+                            self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(2) + "_bottom_c_"+ self.channel+".tiff"
+                        trench_name_stack = kymo_path + "/Stack_Lane_" + str(self.lane).zfill(
+                            2) + "_pos_" + str(
+                            self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(
+                            2) + "_bottom_c_" + self.channel + ".tiff"
+
+
+
+                    kymo_stack = []
+                    kymo_stack = this_kymo.tolist()
+                    kymo_stack[0].save(trench_name_stack, compression="tiff_deflate", save_all=True,
+                                   append_images=kymo_stack[1:])
+
                     this_kymo = np.concatenate(all_kymo[t_i], axis=1).astype(np.uint16)
                     all_kymo[t_i] = None
                     out = PIL.Image.frombytes("I;16", (this_kymo.shape[1], this_kymo.shape[0]), this_kymo.tobytes())
-                    if i == 0:
-                        trench_name = kymo_path + "/Channel_" + self.channel + "_Lane_" + str(self.lane).zfill(
-                            2) + "_pos_" + str(
-                            self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(2) + '_top.tiff'
-                    else:
-                        trench_name = kymo_path + "/Channel_" + self.channel + "_Lane_" + str(self.lane).zfill(
-                            2) + "_pos_" + str(
-                            self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(2) + '_bottom.tiff'
-
                     out.save(trench_name)
             else:
                 print("no trenches detected")
