@@ -187,7 +187,7 @@ class ND2_extractor():
 # todo: trench identification with multiple channels
 class trench_kymograph():
     def __init__(self, nd2_file, main_directory, lane, pos, channel, seg_channel, trench_length, trench_width, spatial,
-                 drift_correct=0, run_drift_correction=0, frame_start=None, frame_limit=None, output_dir=None,
+                 drift_correct=0, find_correct=0, frame_start=None, frame_limit=None, output_dir=None,
                  box_info=None):
         self.prefix = nd2_file[:-4]
         self.main_path = main_directory
@@ -201,6 +201,7 @@ class trench_kymograph():
         self.frame_limit = frame_limit
         self.seg_channel = seg_channel
         self.drift_correct = drift_correct
+        self.find_correct = find_correct
         self.drift_x = None
         self.drift_y = None
         self.drift_x_txt = None
@@ -532,16 +533,17 @@ class trench_kymograph():
             else:
                 print("no trenches detected")
 
+
+
+
     def run_kymo(self):
         self.get_file_list()
         # identify
-        if self.channel == self.seg_channel:
-            if self.drift_correct == 1:
-                # find drift
-                self.find_drift()
-            self.get_trenches()
-            self.kymograph()
+        if self.find_correct == 1:
+            self.find_drift()
         else:
+            if self.channel == seg_channel:
+                self.get_trenches()
             if self.drift_correct == 1:
                 self.read_drift()
                 self.kymograph()
@@ -698,7 +700,6 @@ class trench_kymograph():
 
         return shift
 
-
 ###############
 # test
 if __name__ == "__main__":
@@ -712,7 +713,7 @@ if __name__ == "__main__":
     poses = range(1, 10)
     seg_channel = 'MCHERRY'
     other_channels = ['BF', 'GFP']
-
+    all_channel = ['MCHERRY','BF', 'GFP']
     trench_length = 230
     trench_width = 20
     spatial = 2
@@ -724,23 +725,37 @@ if __name__ == "__main__":
     # drift correct for each lane:
     for lane in lanes:
         pos = poses[0]
-        # channel = seg_channel
-        # new_kymo = trench_kymograph(nd2_file, main_directory, lane, pos, channel, seg_channel, trench_length,
-        #                             trench_width,spatial,drift_correct,frame_start=1)
-        # new_kymo.run_kymo()
-        for channel in other_channels:
-            print channel
-            new_kymo = trench_kymograph(nd2_file, main_directory, lane, pos, channel, seg_channel, trench_length,
-                                        trench_width, spatial, drift_correct, frame_start=1)
+        channel = seg_channel
+        new_kymo = trench_kymograph(nd2_file, main_directory, lane, pos, channel, seg_channel, trench_length,
+                                    trench_width,spatial,drift_correct,find_correct=1,frame_start=1)
+        new_kymo.run_kymo()
+
+        # for channel in other_channels:
+        #     print channel
+        #     new_kymo = trench_kymograph(nd2_file, main_directory, lane, pos, channel, seg_channel, trench_length,
+        #                                 trench_width, spatial, drift_correct, frame_start=1)
+        #     new_kymo.run_kymo()
+
+
+    # trench identify for each pos
+    for lane in lanes:
+        for pos in poses:
+            channel = seg_channel
+            new_kymo = trench_kymograph(nd2_file, main_directory, lane, pos, channel, seg_channel,trench_length,
+                                        trench_width,spatial,drift_correct,frame_start=1,find_correct=0)
             new_kymo.run_kymo()
 
-    # for lane in lanes:
-    #     for pos in poses[1:]:
-    #         for channel in other_channels:
-    #                 new_kymo = trench_kymograph(nd2_file, main_directory, lane, pos, channel, seg_channel,trench_length,
-    #                                             trench_width,spatial,drift_correct,frame_start=1)
-    #                 new_kymo.run_kymo()
 
+    for lane in lanes:
+        for pos in poses:
+            for channel in other_channels:
+                new_kymo = trench_kymograph(nd2_file, main_directory, lane, pos, channel, seg_channel,trench_length,
+                                        trench_width,spatial,drift_correct,frame_start=1,find_correct=0)
+                new_kymo.run_kymo()
+
+
+
+    # trench for all the others
     time_elapsed = datetime.now() - start_t
     print('Time elapsed for extraction (hh:mm:ss.ms) {}'.format(time_elapsed))
 
