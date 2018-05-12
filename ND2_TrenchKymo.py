@@ -756,10 +756,12 @@ if __name__ == "__main__":
                                         trench_width, spatial, drift_correct, frame_start=1, find_correct=0)
             new_kymo.run_kymo()
 
-
-        cores = pathos.multiprocessing.cpu_count()
-        pool = pathos.multiprocessing.Pool(cores)
-        pool.map(helper_kymo, poses)
+        try:
+            cores = pathos.multiprocessing.cpu_count()
+            pool = pathos.multiprocessing.Pool(cores)
+            pool.map(helper_kymo, poses)
+        except:
+            continue
 
 
     for lane in lanes:
@@ -772,9 +774,12 @@ if __name__ == "__main__":
                 new_kymo.run_kymo()
 
 
-            cores = pathos.multiprocessing.cpu_count()
-            pool = pathos.multiprocessing.Pool(cores)
-            pool.map(helper_kymo, poses)
+            try:
+                cores = pathos.multiprocessing.cpu_count()
+                pool = pathos.multiprocessing.Pool(cores)
+                pool.map(helper_kymo, poses)
+            except:
+                continue
 
             # new_kymo = trench_kymograph(nd2_file, main_directory, lane, pos, channel, seg_channel,trench_length,
                 #                         trench_width,spatial,drift_correct,frame_start=1,find_correct=0)
@@ -835,9 +840,12 @@ if __name__ == "__main__":
 
             new_kymo.run_kymo()
 
-        cores = pathos.multiprocessing.cpu_count()
-        pool = pathos.multiprocessing.Pool(cores)
-        pool.map(helper_kymo, poses)
+        try:
+            cores = pathos.multiprocessing.cpu_count()
+            pool = pathos.multiprocessing.Pool(cores)
+            pool.map(helper_kymo, poses)
+        except:
+            continue
 
 
     for lane in lanes:
@@ -848,9 +856,14 @@ if __name__ == "__main__":
                 new_kymo = trench_kymograph(nd2_file, main_directory, lane, p, channel, seg_channel, trench_length,
                                             trench_width, spatial, drift_correct, frame_start=1, find_correct=0)
                 new_kymo.run_kymo()
-            cores = pathos.multiprocessing.cpu_count()
-            pool = pathos.multiprocessing.Pool(cores)
-            pool.map(helper_kymo, poses)
+
+
+            try:
+                cores = pathos.multiprocessing.cpu_count()
+                pool = pathos.multiprocessing.Pool(cores)
+                pool.map(helper_kymo, poses)
+            except:
+                continue
 
             # new_kymo = trench_kymograph(nd2_file, main_directory, lane, pos, channel, seg_channel,trench_length,
                 #                         trench_width,spatial,drift_correct,frame_start=1,find_correct=0)
