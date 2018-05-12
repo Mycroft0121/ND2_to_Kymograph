@@ -818,45 +818,47 @@ if __name__ == "__main__":
     # trench identify for each pos
     for lane in lanes:
         channel = seg_channel
-
-
-        def helper_kymo(p):
-            print(nd2_file, main_directory, lane, p, channel, seg_channel, trench_length,
-                                        trench_width, spatial, drift_correct)
+        for p in poses:
             new_kymo = trench_kymograph(nd2_file, main_directory, lane, p, channel, seg_channel, trench_length,
-                                        trench_width, spatial, drift_correct, frame_start=1, find_correct=0)
-
+                                 trench_width, spatial, drift_correct, frame_start=1, find_correct=0)
             new_kymo.run_kymo()
-
-        cores = pathos.multiprocessing.cpu_count()
-        pool = pathos.multiprocessing.Pool(cores)
-        pool.map(helper_kymo, poses)
-
-
-    for lane in lanes:
-        for channel in other_channels:
-            def helper_kymo(p):
-                print(nd2_file, main_directory, lane, p, channel, seg_channel, trench_length,
-                      trench_width, spatial, drift_correct)
-                new_kymo = trench_kymograph(nd2_file, main_directory, lane, p, channel, seg_channel, trench_length,
-                                            trench_width, spatial, drift_correct, frame_start=1, find_correct=0)
-                new_kymo.run_kymo()
-            cores = pathos.multiprocessing.cpu_count()
-            pool = pathos.multiprocessing.Pool(cores)
-            pool.map(helper_kymo, poses)
-
-            # new_kymo = trench_kymograph(nd2_file, main_directory, lane, pos, channel, seg_channel,trench_length,
-                #                         trench_width,spatial,drift_correct,frame_start=1,find_correct=0)
-                # new_kymo.run_kymo()
-
-
-
-    # trench for all the others
-    time_elapsed = datetime.now() - start_t
-    print('Time elapsed for extraction (hh:mm:ss.ms) {}'.format(time_elapsed))
-
-
-
-
-
-
+        # def helper_kymo(p):
+        #     print(nd2_file, main_directory, lane, p, channel, seg_channel, trench_length,
+        #                                 trench_width, spatial, drift_correct)
+        #     new_kymo = trench_kymograph(nd2_file, main_directory, lane, p, channel, seg_channel, trench_length,
+        #                                 trench_width, spatial, drift_correct, frame_start=1, find_correct=0)
+        #
+        #     new_kymo.run_kymo()
+        #
+        # cores = pathos.multiprocessing.cpu_count()
+        # pool = pathos.multiprocessing.Pool(cores)
+        # pool.map(helper_kymo, poses)
+    #
+    #
+    # for lane in lanes:
+    #     for channel in other_channels:
+    #         def helper_kymo(p):
+    #             print(nd2_file, main_directory, lane, p, channel, seg_channel, trench_length,
+    #                   trench_width, spatial, drift_correct)
+    #             new_kymo = trench_kymograph(nd2_file, main_directory, lane, p, channel, seg_channel, trench_length,
+    #                                         trench_width, spatial, drift_correct, frame_start=1, find_correct=0)
+    #             new_kymo.run_kymo()
+    #         cores = pathos.multiprocessing.cpu_count()
+    #         pool = pathos.multiprocessing.Pool(cores)
+    #         pool.map(helper_kymo, poses)
+    #
+    #         # new_kymo = trench_kymograph(nd2_file, main_directory, lane, pos, channel, seg_channel,trench_length,
+    #             #                         trench_width,spatial,drift_correct,frame_start=1,find_correct=0)
+    #             # new_kymo.run_kymo()
+    #
+    #
+    #
+    # # trench for all the others
+    # time_elapsed = datetime.now() - start_t
+    # print('Time elapsed for extraction (hh:mm:ss.ms) {}'.format(time_elapsed))
+    #
+    #
+    #
+    #
+    #
+    #
