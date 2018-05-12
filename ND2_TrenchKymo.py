@@ -274,7 +274,7 @@ class trench_kymograph():
         for i in range(file_num - 1):
             list_a = peaks[i]
             list_b = peaks[i + 1]
-            x_shift.append(self.pairwise_list_align(list_a, list_b, self.trench_width * 0.9))
+            x_shift.append(self.pairwise_list_align(list_a, list_b, self.trench_width * 0.75))
 
         # positive: drift to the right
         x_shift = np.cumsum(np.array(x_shift)).astype(int)
@@ -714,16 +714,16 @@ if __name__ == "__main__":
     #              drift_correct=0, drift_x_txt = None,drift_y_txt= None,  frame_start=None, frame_limit=None, output_dir=None,
     #              box_info=None):
 
-    nd2_file = "96wellplateBandFor8ROW.nd2"
-    main_directory = r"/Volumes/SysBio/PAULSSON LAB/Juan/20180415_Hysteresis"
+    nd2_file = "20180505_Hysteresis_3min.nd2"
+    main_directory = r"/Volumes/SysBio/PAULSSON LAB/Juan/201800505_Hysteresis"
     lanes = [1]
-    poses = range(1,48)
-    seg_channel = 'MCHERRY'
+    poses = range(1,69)
+    seg_channel = 'RFP'
     other_channels = ['BF', 'GFP']
-    all_channel = ['MCHERRY','BF', 'GFP']
-    trench_length = 230
-    trench_width = 20
-    spatial = 2
+    all_channel = ['RFP','BF', 'GFP']
+    trench_length = 310
+    trench_width = 26
+    spatial = 0
     drift_correct = 1
 
     start_t = datetime.now()
@@ -737,11 +737,6 @@ if __name__ == "__main__":
                                     trench_width,spatial,drift_correct,find_correct=1,frame_start=1)
         new_kymo.run_kymo()
 
-        # for channel in other_channels:
-        #     print channel
-        #     new_kymo = trench_kymograph(nd2_file, main_directory, lane, pos, channel, seg_channel, trench_length,
-        #                                 trench_width, spatial, drift_correct, frame_start=1)
-        #     new_kymo.run_kymo()
 
 
     def helper_kymo(p):
@@ -773,5 +768,71 @@ if __name__ == "__main__":
     # trench for all the others
     time_elapsed = datetime.now() - start_t
     print('Time elapsed for extraction (hh:mm:ss.ms) {}'.format(time_elapsed))
+
+
+
+
+
+
+
+
+    nd2_file = "20180501_GrowthCurveandCollection.nd2"
+    main_directory = r"/Volumes/SysBio/PAULSSON LAB/Juan/201800501_Hysteresis"
+    lanes = [1]
+    poses = range(1,68)
+    seg_channel = 'RFP'
+    other_channels = ['BF', 'GFP']
+    all_channel = ['RFP','BF', 'GFP']
+    trench_length = 350
+    trench_width = 22
+    spatial = 0
+    drift_correct = 1
+
+    start_t = datetime.now()
+    print('Kymo starts ')
+
+    # drift correct for each lane:
+    for lane in lanes:
+        pos = poses[0]
+        channel = seg_channel
+        new_kymo = trench_kymograph(nd2_file, main_directory, lane, pos, channel, seg_channel, trench_length,
+                                    trench_width,spatial,drift_correct,find_correct=1,frame_start=1)
+        new_kymo.run_kymo()
+
+
+
+    def helper_kymo(p):
+        new_kymo = trench_kymograph(nd2_file, main_directory, lane, p, channel, seg_channel, trench_length,
+                                    trench_width, spatial, drift_correct, frame_start=1, find_correct=0)
+        new_kymo.run_kymo()
+
+    # trench identify for each pos
+    for lane in lanes:
+        channel = seg_channel
+
+        cores = pathos.multiprocessing.cpu_count()
+        pool = pathos.multiprocessing.Pool(cores)
+        pool.map(helper_kymo, poses)
+
+
+    for lane in lanes:
+        for channel in other_channels:
+            cores = pathos.multiprocessing.cpu_count()
+            pool = pathos.multiprocessing.Pool(cores)
+            pool.map(helper_kymo, poses)
+
+            # new_kymo = trench_kymograph(nd2_file, main_directory, lane, pos, channel, seg_channel,trench_length,
+                #                         trench_width,spatial,drift_correct,frame_start=1,find_correct=0)
+                # new_kymo.run_kymo()
+
+
+
+    # trench for all the others
+    time_elapsed = datetime.now() - start_t
+    print('Time elapsed for extraction (hh:mm:ss.ms) {}'.format(time_elapsed))
+
+
+
+
 
 
