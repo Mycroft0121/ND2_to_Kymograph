@@ -417,7 +417,7 @@ class trench_kymograph():
                 ind_list = np.array(ind_list)
                 peak_ind_dict[i] = ind_list
         else:
-            im_trenches = perc[top[0]:bottom[0]]
+            im_trenches = perc[self.tops[0]:self.bottoms[0]]
             im_trenches_perc = np.percentile(im_trenches, 80, axis=0)
             # normalize intensity
             im_min = im_trenches_perc.min()
