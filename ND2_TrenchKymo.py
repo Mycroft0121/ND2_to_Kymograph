@@ -729,7 +729,7 @@ if __name__ == "__main__":
     start_t = datetime.now()
     print('Kymo starts ')
 
-    drift correct for each lane:
+    # drift correct for each lane:
     for lane in lanes:
         pos = poses[0]
         channel = seg_channel
