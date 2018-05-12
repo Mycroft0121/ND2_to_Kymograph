@@ -746,6 +746,8 @@ if __name__ == "__main__":
 
 
         def helper_kymo(p):
+            print(nd2_file, main_directory, lane, p, channel, seg_channel, trench_length,
+                  trench_width, spatial, drift_correct)
             new_kymo = trench_kymograph(nd2_file, main_directory, lane, p, channel, seg_channel, trench_length,
                                         trench_width, spatial, drift_correct, frame_start=1, find_correct=0)
             new_kymo.run_kymo()
@@ -759,6 +761,8 @@ if __name__ == "__main__":
     for lane in lanes:
         for channel in other_channels:
             def helper_kymo(p):
+                print(nd2_file, main_directory, lane, p, channel, seg_channel, trench_length,
+                      trench_width, spatial, drift_correct)
                 new_kymo = trench_kymograph(nd2_file, main_directory, lane, p, channel, seg_channel, trench_length,
                                             trench_width, spatial, drift_correct, frame_start=1, find_correct=0)
                 new_kymo.run_kymo()
@@ -817,8 +821,11 @@ if __name__ == "__main__":
 
 
         def helper_kymo(p):
+            print(nd2_file, main_directory, lane, p, channel, seg_channel, trench_length,
+                                        trench_width, spatial, drift_correct)
             new_kymo = trench_kymograph(nd2_file, main_directory, lane, p, channel, seg_channel, trench_length,
                                         trench_width, spatial, drift_correct, frame_start=1, find_correct=0)
+
             new_kymo.run_kymo()
 
         cores = pathos.multiprocessing.cpu_count()
@@ -829,6 +836,8 @@ if __name__ == "__main__":
     for lane in lanes:
         for channel in other_channels:
             def helper_kymo(p):
+                print(nd2_file, main_directory, lane, p, channel, seg_channel, trench_length,
+                      trench_width, spatial, drift_correct)
                 new_kymo = trench_kymograph(nd2_file, main_directory, lane, p, channel, seg_channel, trench_length,
                                             trench_width, spatial, drift_correct, frame_start=1, find_correct=0)
                 new_kymo.run_kymo()
