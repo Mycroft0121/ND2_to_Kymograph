@@ -36,9 +36,6 @@ import re
 import pathos.multiprocessing
 from datetime import datetime
 import h5py
-import cv2
-import operator
-from joblib import Parallel, delayed
 
 
 # todo: fix extractor xml file problem
