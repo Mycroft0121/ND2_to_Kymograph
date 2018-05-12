@@ -17,11 +17,9 @@
 
 
 import matplotlib.pyplot as pl
-import itertools
 import glob  # pathname pattern
 
 from PIL import Image
-import ast
 
 # from ND2 extractor
 
@@ -36,6 +34,7 @@ import re
 import pathos.multiprocessing
 from datetime import datetime
 import h5py
+from tifffile import imsave
 
 
 # todo: fix extractor xml file problem
@@ -514,10 +513,6 @@ class trench_kymograph():
                         all_kymo[t_i][f_i] = trench.astype(np.uint16)
 
                 for t_i in range(trench_num):
-
-
-
-
                     if i == 0:
                         trench_name = kymo_path + "/Lane_" + str(self.lane).zfill(
                             2) + "_pos_" + str(
@@ -535,11 +530,11 @@ class trench_kymograph():
                             2) + "_bottom_c_" + self.channel + ".tiff"
 
 
+                    imsave(trench_name_stack,all_kymo[t_i])
 
-
-                    kymo_stack = all_kymo[t_i].tolist()
-                    kymo_stack[0].save(trench_name_stack, compression="tiff_deflate", save_all=True,
-                                   append_images=kymo_stack[1:])
+                    # kymo_stack = all_kymo[t_i].tolist()
+                    # kymo_stack[0].save(trench_name_stack, compression="tiff_deflate", save_all=True,
+                    #                append_images=kymo_stack[1:])
 
                     this_kymo = np.concatenate(all_kymo[t_i], axis=1).astype(np.uint16)
                     all_kymo[t_i] = None
