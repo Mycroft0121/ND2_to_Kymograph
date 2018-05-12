@@ -819,6 +819,7 @@ if __name__ == "__main__":
     for lane in lanes:
         channel = seg_channel
         for p in poses:
+            print(lane, p)
             new_kymo = trench_kymograph(nd2_file, main_directory, lane, p, channel, seg_channel, trench_length,
                                  trench_width, spatial, drift_correct, frame_start=1, find_correct=0)
             new_kymo.run_kymo()
