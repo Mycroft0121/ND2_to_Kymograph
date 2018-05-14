@@ -261,7 +261,12 @@ class trench_kymograph():
             # print(self.find_top(i))
             tops.append(self.find_top(i))
 
-        y_shift = y_shift + (np.ediff1d(tops)).tolist()
+        for i in range(len(tops)-1):
+            diff = tops[i+1] - tops[i]
+            if diff >10:
+                diff = 0
+            y_shift.append(diff)
+        # y_shift = y_shift + (np.ediff1d(tops)).tolist()
 
         # y_shift = np.concatenate(y_shift,np.ediff1d(tops))
         for i in range(len(self.file_list)):
@@ -274,7 +279,9 @@ class trench_kymograph():
         for i in range(file_num - 1):
             list_a = peaks[i]
             list_b = peaks[i + 1]
-            x_shift.append(self.pairwise_list_align(list_a, list_b, self.trench_width * 0.75))
+            move = self.pairwise_list_align(list_a, list_b, self.trench_width * 0.75)
+            x_shift.append(move)
+
 
         # positive: drift to the right
         x_shift = np.cumsum(np.array(x_shift)).astype(int)
@@ -317,6 +324,8 @@ class trench_kymograph():
         return top
 
     def find_peaks(self, i, tops):
+        # todo
+        i = 0
         im_i = pl.imread(self.file_list[i])
         # crop the trench region
         im_trenches = im_i[tops[i]:tops[i] + self.trench_length]
@@ -680,6 +689,9 @@ class trench_kymograph():
 
     @staticmethod
     def pairwise_list_align(list_a, list_b, max_gap):
+        # print(list_a)
+        # print(list_b)
+        # print(max_gap)
         shift = 0
         matches = 0
         i_b = 0
@@ -688,7 +700,8 @@ class trench_kymograph():
         list_a = list_a[1:-1]
         for x in list_a:
             found = 0
-            while not found & i_b < len_b:
+            while (not found) & (i_b < len_b):
+
                 diff = list_b[i_b] - x
 
                 if diff < -max_gap:
@@ -702,6 +715,7 @@ class trench_kymograph():
                     matches += 1
                     i_b += 1  # don't compare with the matched one for the next cell
                     len_b -= 1
+                    #print(shift)
         if matches:
             shift = shift * 1. / matches
 
@@ -760,6 +774,8 @@ if __name__ == "__main__":
             cores = pathos.multiprocessing.cpu_count()
             pool = pathos.multiprocessing.Pool(cores)
             pool.map(helper_kymo, poses)
+            pool.close()
+            pool.join()
         except:
             continue
 
@@ -778,6 +794,8 @@ if __name__ == "__main__":
                 cores = pathos.multiprocessing.cpu_count()
                 pool = pathos.multiprocessing.Pool(cores)
                 pool.map(helper_kymo, poses)
+                pool.close()
+                pool.join()
             except:
                 continue
 
@@ -806,7 +824,7 @@ if __name__ == "__main__":
     other_channels = ['BF', 'GFP']
     all_channel = ['RFP','BF', 'GFP']
     trench_length = 350
-    trench_width = 22
+    trench_width = 24
     spatial = 0
     drift_correct = 1
 
@@ -844,6 +862,8 @@ if __name__ == "__main__":
             cores = pathos.multiprocessing.cpu_count()
             pool = pathos.multiprocessing.Pool(cores)
             pool.map(helper_kymo, poses)
+            pool.close()
+            pool.join()
         except:
             continue
 
@@ -862,6 +882,8 @@ if __name__ == "__main__":
                 cores = pathos.multiprocessing.cpu_count()
                 pool = pathos.multiprocessing.Pool(cores)
                 pool.map(helper_kymo, poses)
+                pool.close()
+                pool.join()
             except:
                 continue
 
