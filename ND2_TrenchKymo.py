@@ -32,6 +32,8 @@ from pims import ND2_Reader
 import xml.etree.cElementTree as ET
 import re
 import pathos.multiprocessing
+import multiprocessing
+
 from datetime import datetime
 import h5py
 from tifffile import imsave
@@ -245,6 +247,7 @@ class trench_kymograph():
 
         self.file_list = self.file_list[self.frame_start:self.frame_end]
         [self.height, self.width] = pl.imread(self.file_list[0]).shape
+        return
 
     def find_drift(self):
         lane_path = self.main_path + "/" + self.prefix + "/Lane_" + str(self.lane).zfill(2)
@@ -261,9 +264,10 @@ class trench_kymograph():
             tops.append(self.find_top(i))
 
         for i in range(len(tops)-1):
-            diff = tops[i+1] - tops[i]
-            if diff > 10:
-                diff = 0
+            diff = 0
+            # diff = tops[i+1] - tops[i]
+            # if diff > 10:
+            #     diff = 0
             y_shift.append(diff)
 
         for i in range(len(self.file_list)):
@@ -271,6 +275,9 @@ class trench_kymograph():
 
         # positive: downwards drift
         drift_y.write(' '.join(map(str, y_shift)))
+        # print(y_shift)
+
+
         x_shift = [0]
 
         for i in range(file_num - 1):
@@ -288,6 +295,7 @@ class trench_kymograph():
         self.drift_y = y_shift
         self.drift_x_txt = 'drift_x.txt'
         self.drift_y_txt = 'drift_y.txt'
+        return
 
     def read_drift(self):
         self.drift_x_txt = 'drift_x.txt'
@@ -298,6 +306,7 @@ class trench_kymograph():
         # read files into np array
         self.drift_x = np.loadtxt(self.drift_x_txt, dtype=int, delimiter=' ')
         self.drift_y = np.loadtxt(self.drift_y_txt, dtype=int, delimiter=' ')
+        return
 
     def find_top(self, i):
         im_i = pl.imread(self.file_list[i])
@@ -485,6 +494,7 @@ class trench_kymograph():
             hf.create_dataset('upper_index', data=self.tops[0])
             hf.create_dataset('lower_index', data=self.bottoms[0])
             hf.close()
+        return
 
     def kymograph(self):
         if self.box_info == None:
@@ -502,8 +512,12 @@ class trench_kymograph():
 
         os.chdir(self.file_path)
         kymo_path = self.file_path + '/Kymographs'
+        # print(kymo_path)
+        # print(os.path.exists(kymo_path))
         if not os.path.exists(kymo_path):
             os.makedirs(kymo_path)
+
+
         for i in range(len(self.box_info)):
             hf = h5py.File(self.box_info[i], 'r')
             ind_list = hf.get('box').value
@@ -532,8 +546,10 @@ class trench_kymograph():
                         move_x = 0
                         move_y = 0
                     for t_i in range(trench_num):
+
                         trench_left, trench_right = ind_list[t_i]
-                        trench = im_t[upper_index+move_y:lower_index+move_y, max(0, trench_left+move_x):max(0, trench_left+move_x)+self.trench_width]
+                        trench = np.zeros((lower_index - upper_index, self.trench_width))
+                        trench[:,:max(0, trench_left+move_x)+self.trench_width] = im_t[upper_index+move_y:lower_index+move_y, max(0, trench_left+move_x):max(0, trench_left+move_x)+self.trench_width]
                         all_kymo[t_i][f_i] = trench.astype(np.uint16)
 
                 for t_i in range(trench_num):
@@ -559,6 +575,7 @@ class trench_kymograph():
                     out.save(trench_name)
             else:
                 print("no trenches detected")
+        return
 
     def run_kymo(self):
         self.get_file_list()
@@ -573,6 +590,7 @@ class trench_kymograph():
                 self.kymograph()
             else:
                 self.kymograph()
+        return
 
     @staticmethod
     def to_8_bit(im):
@@ -731,95 +749,245 @@ class trench_kymograph():
         return shift
 
 
-
-
-
-
-
-
 ###############
 # test
 if __name__ == "__main__":
     # def __init__(self, nd2_file, main_directory, lane, pos, channel, seg_channel,  trench_length, trench_width,spatial,
     #              drift_correct=0, drift_x_txt = None,drift_y_txt= None,  frame_start=None, frame_limit=None, output_dir=None,
     #              box_info=None):
-    nd2_file = "HYSTERESYS_SPEEDUP_1min--Round2.nd2"
-    main_directory =r"/Volumes/Samsung_T3/"
-    lanes = [1]
-    poses = [11]
-
-    seg_channel = 'MCHERRY'
-    other_channels = ['GFP']
-    all_channel = ['MCHERRY', 'GFP']
-    trench_length = 220
-    trench_width = 26   # has to be even
-    spatial = 2
-    drift_correct = 1
-
-    start_t = datetime.now()
-    print('Kymo starts ')
-
-    # # drift correct for each lane:
-    for lane in lanes:
-        pos = poses[0]
-        channel = seg_channel
-        new_kymo = trench_kymograph(nd2_file, main_directory, lane, pos, channel, seg_channel, trench_length,
-                                    trench_width,spatial,drift_correct,find_correct=1,frame_start=1)
-        new_kymo.run_kymo()
 
 
-    # trench identify for each pos
-    for lane in lanes:
-        channel = seg_channel
 
-        for p in poses:
-            print(lane, p)
-            new_kymo = trench_kymograph(nd2_file, main_directory, lane, p, channel, seg_channel, trench_length,
-                                 trench_width, spatial, drift_correct, frame_start=1, find_correct=0)
+    # nd2_file, main_directory, lane, pos, channel, seg_channel, trench_length, trench_width, spatial,
+    #              drift_correct=0, find_correct=0, frame_start=None, frame_limit=None, output_dir=None,
+    #              box_info=None
+
+    def run_kymo_generator(nd2_file, main_directory, lanes, poses, other_channels, seg_channel,  trench_length, trench_width,spatial,
+                           drift_correct, frame_start=None, frame_limit=None, output_dir=None, box_info=None):
+
+        start_t = datetime.now()
+        print('Kymo starts ')
+        # drift correct for each lane:
+        for lane in lanes:
+            pos = poses[0]
+            channel = seg_channel
+            find_correct = 1
+            new_kymo = trench_kymograph(nd2_file, main_directory, lane, pos, channel, seg_channel, trench_length,
+                                        trench_width, spatial, drift_correct, find_correct, frame_start, frame_limit,
+                                        output_dir, box_info)
             new_kymo.run_kymo()
-        # def helper_kymo(p):
-        #     print(nd2_file, main_directory, lane, p, channel, seg_channel, trench_length,
-        #           trench_width, spatial, drift_correct)
-        #     new_kymo = trench_kymograph(nd2_file, main_directory, lane, p, channel, seg_channel, trench_length,
-        #                                 trench_width, spatial, drift_correct, frame_start=1, find_correct=0)
-        #     new_kymo.run_kymo()
-        #
-        # try:
-        #     cores = pathos.multiprocessing.cpu_count()
-        #     pool = pathos.multiprocessing.Pool(cores)
-        #     pool.map(helper_kymo, poses)
-        #
-        # except:
-        #     print("wtf")
-        #     continue
 
-
-    for lane in lanes:
-        for channel in other_channels:
+        # trench identify for each pos
+        for lane in lanes:
+            channel = seg_channel
+            # for p in poses:
+            #     print(p)
+            #     new_kymo = trench_kymograph(nd2_file, main_directory, lane, p, channel, seg_channel, trench_length,
+            #                             trench_width, spatial, drift_correct, frame_start=1, find_correct=0)
+            #     new_kymo.run_kymo()
             def helper_kymo(p):
-                print(nd2_file, main_directory, lane, p, channel, seg_channel, trench_length,
-                      trench_width, spatial, drift_correct)
                 new_kymo = trench_kymograph(nd2_file, main_directory, lane, p, channel, seg_channel, trench_length,
                                             trench_width, spatial, drift_correct, frame_start=1, find_correct=0)
                 new_kymo.run_kymo()
+                return 0
+
+            cores = multiprocessing.cpu_count()
+            jobs = []
+            batch_num = len(poses)/cores + 1
+
+            for i in range(batch_num):
+                start_ind = i * cores
+                end_ind   = start_ind + cores
+                partial_poses = poses[start_ind:end_ind]
+
+                for p in partial_poses:
+                    j = multiprocessing.Process(target=helper_kymo, args=(p,))
+                    jobs.append(j)
+                    j.start()
+                    print(p, j.pid)
+
+                for job in jobs:
+                    print(job.pid)
+                    job.join()
+
+            # pool = pathos.multiprocessing.Pool(cores)
+            # pool.map(helper_kymo, poses)
 
 
-            try:
-                cores = pathos.multiprocessing.cpu_count()
-                pool = pathos.multiprocessing.Pool(cores)
-                pool.map(helper_kymo, poses)
-
-            except:
-                continue
-
-            # new_kymo = trench_kymograph(nd2_file, main_directory, lane, pos, channel, seg_channel,trench_length,
-                #                         trench_width,spatial,drift_correct,frame_start=1,find_correct=0)
-                # new_kymo.run_kymo()
 
 
+            # try:
+            #     cores = pathos.multiprocessing.cpu_count()
+            #     pool = pathos.multiprocessing.Pool(cores)
+            #     pool.map(helper_kymo, poses)
+            #     pool.close()
+            #     pool.terminate()
+            #     pool.join()
+            #     print("hola")
+            # except:
+            #     print("wtf")
+            #     continue
+
+            print("hola")
+
+        for lane in lanes:
+            for channel in other_channels:
+                print("lane channel ", lane, channel)
+                def helper_kymo(p):
+                    new_kymo = trench_kymograph(nd2_file, main_directory, lane, p, channel, seg_channel, trench_length,
+                                                trench_width, spatial, drift_correct, frame_start=1, find_correct=0)
+                    new_kymo.run_kymo()
+
+                cores = multiprocessing.cpu_count()
+                jobs = []
+                batch_num = len(poses) / cores + 1
+
+                for i in range(batch_num):
+                    start_ind = i * cores
+                    end_ind = start_ind + cores
+                    partial_poses = poses[start_ind:end_ind]
+
+                    for p in partial_poses:
+                        j = multiprocessing.Process(target=helper_kymo, args=(p,))
+                        jobs.append(j)
+                        j.start()
+                        print(p, j.pid)
+
+                    for job in jobs:
+                        print(job.pid)
+                        job.join()
 
 
 
+            print("woohoo")
+
+        time_elapsed = datetime.now() - start_t
+        print('Time elapsed for extraction (hh:mm:ss.ms) {}'.format(time_elapsed))
+
+
+
+
+
+
+    nd2_file = "20180501_GrowthCurveandCollection.nd2"
+    main_directory =r"/Volumes/SysBio/PAULSSON LAB/Juan/20180501_Hysteresis"
+    lanes = [1]
+    poses = range(2,68)
+    # poses = [11]
+    seg_channel = 'RFP'
+    other_channels = ['BF','GFP']
+
+    trench_length = 320
+    trench_width = 30 # has to be even
+    spatial = 0
+    drift_correct = 1
+
+
+
+    #
+    # lane = 1
+    # p =11
+    # channel = seg_channel
+    #
+    # new_kymo = trench_kymograph(nd2_file, main_directory, lane, p, channel, seg_channel, trench_length,
+    #                             trench_width, spatial, drift_correct, frame_start=1, find_correct=0)
+    # new_kymo.run_kymo()
+    run_kymo_generator(nd2_file, main_directory, lanes, poses, other_channels, seg_channel, trench_length, trench_width,
+                    spatial, drift_correct)
+
+
+
+    #
+    # nd2_file = "20180505_Hysteresis_3min.nd2"
+    # main_directory =r"/Volumes/SysBio/PAULSSON LAB/Juan/20180505_Hysteresis/"
+    # lanes = [1]
+    # poses = range(2,69)
+    #
+    # seg_channel = 'RFP'
+    # other_channels = ['BF','GFP']
+    #
+    # trench_length = 310
+    # trench_width = 30 # has to be even
+    # spatial = 0
+    # drift_correct = 1
+    # run_kymo_generator(nd2_file, main_directory, lanes, poses, other_channels, seg_channel, trench_length, trench_width,
+    #                    spatial, drift_correct)
+    #
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    # # # drift correct for each lane:
+    # for lane in lanes:
+    #     pos = poses[0]
+    #     channel = seg_channel
+    #     new_kymo = trench_kymograph(nd2_file, main_directory, lane, pos, channel, seg_channel, trench_length,
+    #                                 trench_width,spatial,drift_correct,find_correct=1,frame_start=1)
+    #     new_kymo.run_kymo()
+    #
+    #
+    # # trench identify for each pos
+    # for lane in lanes:
+    #     channel = seg_channel
+    #
+    #     for p in poses:
+    #         print(lane, p)
+    #         new_kymo = trench_kymograph(nd2_file, main_directory, lane, p, channel, seg_channel, trench_length,
+    #                              trench_width, spatial, drift_correct, frame_start=1, find_correct=0)
+    #         new_kymo.run_kymo()
+    #     # def helper_kymo(p):
+    #     #     print(nd2_file, main_directory, lane, p, channel, seg_channel, trench_length,
+    #     #           trench_width, spatial, drift_correct)
+    #     #     new_kymo = trench_kymograph(nd2_file, main_directory, lane, p, channel, seg_channel, trench_length,
+    #     #                                 trench_width, spatial, drift_correct, frame_start=1, find_correct=0)
+    #     #     new_kymo.run_kymo()
+    #     #
+    #     # try:
+    #     #     cores = pathos.multiprocessing.cpu_count()
+    #     #     pool = pathos.multiprocessing.Pool(cores)
+    #     #     pool.map(helper_kymo, poses)
+    #     #
+    #     # except:
+    #     #     print("wtf")
+    #     #     continue
+    #
+    #
+    # for lane in lanes:
+    #     for channel in other_channels:
+    #         def helper_kymo(p):
+    #             print(nd2_file, main_directory, lane, p, channel, seg_channel, trench_length,
+    #                   trench_width, spatial, drift_correct)
+    #             new_kymo = trench_kymograph(nd2_file, main_directory, lane, p, channel, seg_channel, trench_length,
+    #                                         trench_width, spatial, drift_correct, frame_start=1, find_correct=0)
+    #             new_kymo.run_kymo()
+    #
+    #
+    #         try:
+    #             cores = pathos.multiprocessing.cpu_count()
+    #             pool = pathos.multiprocessing.Pool(cores)
+    #             pool.map(helper_kymo, poses)
+    #
+    #         except:
+    #             continue
+    #
+    #         # new_kymo = trench_kymograph(nd2_file, main_directory, lane, pos, channel, seg_channel,trench_length,
+    #             #                         trench_width,spatial,drift_correct,frame_start=1,find_correct=0)
+    #             # new_kymo.run_kymo()
+    #
+    #
+    #
+    #
+    #
 
 
 
@@ -903,8 +1071,7 @@ if __name__ == "__main__":
     #             #                         trench_width,spatial,drift_correct,frame_start=1,find_correct=0)
     #             # new_kymo.run_kymo()
 
-    time_elapsed = datetime.now() - start_t
-    print('Time elapsed for extraction (hh:mm:ss.ms) {}'.format(time_elapsed))
+
 
 
 
