@@ -752,16 +752,6 @@ class trench_kymograph():
 ###############
 # test
 if __name__ == "__main__":
-    # def __init__(self, nd2_file, main_directory, lane, pos, channel, seg_channel,  trench_length, trench_width,spatial,
-    #              drift_correct=0, drift_x_txt = None,drift_y_txt= None,  frame_start=None, frame_limit=None, output_dir=None,
-    #              box_info=None):
-
-
-
-    # nd2_file, main_directory, lane, pos, channel, seg_channel, trench_length, trench_width, spatial,
-    #              drift_correct=0, find_correct=0, frame_start=None, frame_limit=None, output_dir=None,
-    #              box_info=None
-
     def run_kymo_generator(nd2_file, main_directory, lanes, poses, other_channels, seg_channel,  trench_length, trench_width,spatial,
                            drift_correct, frame_start=None, frame_limit=None, output_dir=None, box_info=None):
 
@@ -780,11 +770,6 @@ if __name__ == "__main__":
         # trench identify for each pos
         for lane in lanes:
             channel = seg_channel
-            # for p in poses:
-            #     print(p)
-            #     new_kymo = trench_kymograph(nd2_file, main_directory, lane, p, channel, seg_channel, trench_length,
-            #                             trench_width, spatial, drift_correct, frame_start=1, find_correct=0)
-            #     new_kymo.run_kymo()
             def helper_kymo(p):
                 new_kymo = trench_kymograph(nd2_file, main_directory, lane, p, channel, seg_channel, trench_length,
                                             trench_width, spatial, drift_correct, frame_start=1, find_correct=0)
@@ -810,25 +795,6 @@ if __name__ == "__main__":
                     print(job.pid)
                     job.join()
 
-            # pool = pathos.multiprocessing.Pool(cores)
-            # pool.map(helper_kymo, poses)
-
-
-
-
-            # try:
-            #     cores = pathos.multiprocessing.cpu_count()
-            #     pool = pathos.multiprocessing.Pool(cores)
-            #     pool.map(helper_kymo, poses)
-            #     pool.close()
-            #     pool.terminate()
-            #     pool.join()
-            #     print("hola")
-            # except:
-            #     print("wtf")
-            #     continue
-
-            print("hola")
 
         for lane in lanes:
             for channel in other_channels:
@@ -857,8 +823,6 @@ if __name__ == "__main__":
                         print(job.pid)
                         job.join()
 
-
-
             print("woohoo")
 
         time_elapsed = datetime.now() - start_t
@@ -866,59 +830,92 @@ if __name__ == "__main__":
 
 
 
-
-
-
-    nd2_file = "20180501_GrowthCurveandCollection.nd2"
-    main_directory =r"/Volumes/SysBio/PAULSSON LAB/Juan/20180501_Hysteresis"
-    lanes = [1]
-    poses = range(2,68)
-    # poses = [11]
-    seg_channel = 'RFP'
-    other_channels = ['BF','GFP']
-
-    trench_length = 320
-    trench_width = 30 # has to be even
-    spatial = 0
-    drift_correct = 1
-
-
-
-    #
-    # lane = 1
-    # p =11
-    # channel = seg_channel
-    #
-    # new_kymo = trench_kymograph(nd2_file, main_directory, lane, p, channel, seg_channel, trench_length,
-    #                             trench_width, spatial, drift_correct, frame_start=1, find_correct=0)
-    # new_kymo.run_kymo()
-    run_kymo_generator(nd2_file, main_directory, lanes, poses, other_channels, seg_channel, trench_length, trench_width,
-                    spatial, drift_correct)
-
-
-
-    #
-    # nd2_file = "20180505_Hysteresis_3min.nd2"
-    # main_directory =r"/Volumes/SysBio/PAULSSON LAB/Juan/20180505_Hysteresis/"
+    # nd2_file = "20180501_GrowthCurveandCollection.nd2"
+    # main_directory =r"/Volumes/SysBio/PAULSSON LAB/Juan/20180501_Hysteresis"
     # lanes = [1]
-    # poses = range(2,69)
-    #
+    # poses = range(2,68)
+    # # poses = [11]
     # seg_channel = 'RFP'
     # other_channels = ['BF','GFP']
     #
-    # trench_length = 310
+    # trench_length = 320
     # trench_width = 30 # has to be even
     # spatial = 0
     # drift_correct = 1
     # run_kymo_generator(nd2_file, main_directory, lanes, poses, other_channels, seg_channel, trench_length, trench_width,
-    #                    spatial, drift_correct)
-    #
+    #                 spatial, drift_correct)
 
 
 
 
+    nd2_file = "20180505_Hysteresis_3min.nd2"
+    main_directory =r"/Volumes/SysBio/PAULSSON LAB/Juan/20180505_Hysteresis"
+    lanes = [1]
+    poses = range(2,69)
+
+    seg_channel = 'RFP'
+    other_channels = ['BF','GFP']
+
+    trench_length = 310
+    trench_width = 30 # has to be even
+    spatial = 0
+    drift_correct = 1
+    run_kymo_generator(nd2_file, main_directory, lanes, poses, other_channels, seg_channel, trench_length, trench_width,
+                       spatial, drift_correct)
 
 
+
+
+    nd2_file = "HYSTERESYS_SPEEDUP_1min--Round2.nd2"
+    main_directory =r"/Volumes/SysBio/PAULSSON LAB/Leoncini/DATA_Ti3/20180406--HYSTERESIS_1min"
+    lanes = [1]
+    poses = [2] + range(4,68)
+
+    seg_channel = 'MCHERRY'
+    other_channels = ['GFP']
+
+    trench_length = 240
+    trench_width = 30 # has to be even
+    spatial = 2
+    drift_correct = 1
+    run_kymo_generator(nd2_file, main_directory, lanes, poses, other_channels, seg_channel, trench_length, trench_width,
+                       spatial, drift_correct)
+
+
+
+
+    nd2_file = "HYSTERESYS_SPEEDUP_1min--Round2.nd2"
+    main_directory =r"/Volumes/SysBio/PAULSSON LAB/Leoncini/DATA_Ti3/20180406--HYSTERESIS_1min"
+    lanes = [1]
+    poses = range(2,68)
+
+    seg_channel = 'MCHERRY'
+    other_channels = ['GFP']
+
+    trench_length = 240
+    trench_width = 30 # has to be even
+    spatial = 2
+    drift_correct = 1
+    run_kymo_generator(nd2_file, main_directory, lanes, poses, other_channels, seg_channel, trench_length, trench_width,
+                       spatial, drift_correct)
+
+
+
+
+    nd2_file = "20180404--HYSTERESIS_ROBOT.nd2"
+    main_directory =r"/Volumes/SysBio/PAULSSON LAB/Leoncini/DATA_Ti3/20180404--HYSTERESIS_ROBOT"
+    lanes = [1]
+    poses = range(2,67)
+
+    seg_channel = 'MCHERRY'
+    other_channels = ['GFP']
+
+    trench_length = 260
+    trench_width = 30 # has to be even
+    spatial = 2
+    drift_correct = 1
+    run_kymo_generator(nd2_file, main_directory, lanes, poses, other_channels, seg_channel, trench_length, trench_width,
+                       spatial, drift_correct)
 
 
 
