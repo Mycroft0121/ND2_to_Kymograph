@@ -1,5 +1,6 @@
 # ND2 extractor, Kymograph generator
-# author: Emanuele Leoncini, Suyang Wan, Sadik Yidik
+# author: Suyang Wan, Sadik Yidik
+# This is a translation of Emanuele Leoncini's FIJI code in terms of identify trenches in phase contrast images
 # product manager: Emanuele Leoncini, Somenath Bakshi
 
 #
