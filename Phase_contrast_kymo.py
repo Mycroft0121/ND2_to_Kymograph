@@ -56,6 +56,7 @@ from multiprocessing import Pool
 from skimage import util
 from PIL import Image, ImageEnhance
 from skimage.exposure import equalize_adapthist
+import shutil
 
 #############
 # todo: deal with trenches at bottom & one fov with 2 trenches
@@ -150,10 +151,11 @@ class trench_kymograph():
     def background_enhance(self):
         self.get_file_list() # run on original data
         self.enhanced_path = self.file_path + '/enhanced'
-        print(self.enhanced_path)
+        # print(self.enhanced_path)
         if not os.path.exists(self.enhanced_path):
             os.makedirs(self.enhanced_path)
-            for i in range(self.file_length):
+            # for i in range(self.file_length):
+            for i in range(50):
                 im_i = self.get_frame(i)
                 if np.max(im_i) >255:
                     im_i = self.to_8_bit(im_i)
@@ -179,7 +181,8 @@ class trench_kymograph():
         if not os.path.exists(cropped_path):
             os.makedirs(cropped_path)
         self.get_file_list(self.file_path + '/enhanced')
-        for i in range(self.file_length):
+        # for i in range(self.file_length):
+        for i in range(50):
             im_i = self.get_frame(i)
             if np.max(im_i) >255:
                 im_i = self.to_8_bit(im_i)
@@ -224,8 +227,9 @@ class trench_kymograph():
 
         out.save(out_file)
 
-        sub_height = 200
+
         # only analysis the tip
+        sub_height = 50
         im_tip = self.im_projected[:sub_height, :]
         # remove small elements
         tip_trench = label(im_tip)
@@ -241,13 +245,13 @@ class trench_kymograph():
 
         self.im_projected = im_tip
 
-        # close
-        # run("Options...", "iterations=5 count=1 black pad edm=8-bit do=Close stack");
-        im_closed = binary_closing(self.im_projected/255,structure=np.ones((4,4)),iterations=5)
-        im_closed = (255*im_closed).astype(np.int8)
-        out_file = "closed_mask.tiff"
-        out = PIL.Image.frombytes("L", (self.width, sub_height), im_closed.tobytes())
-        out.save(out_file)
+        # # close
+        # # run("Options...", "iterations=5 count=1 black pad edm=8-bit do=Close stack");
+        # im_closed = binary_closing(self.im_projected/255,structure=np.ones((4,4)),iterations=5)
+        # im_closed = (255*im_closed).astype(np.int8)
+        # out_file = "closed_mask.tiff"
+        # out = PIL.Image.frombytes("L", (self.width, sub_height), im_closed.tobytes())
+        # out.save(out_file)
 
         # vertical dilation
         structure = np.zeros((9, 9))
@@ -256,19 +260,21 @@ class trench_kymograph():
         structure[6, 4] = 1
         structure[7, 4] = 1
         structure[8, 4] = 1
-        im_dilated = binary_dilation(im_closed,structure=structure, iterations=20)
+
+        # im_dilated = binary_dilation(im_closed,structure=structure, iterations=20)
+        im_dilated = binary_dilation(im_tip, structure=structure, iterations=20)
         im_dilated = (255*im_dilated).astype(np.int8)
         out_file = "dilated_mask.tiff"
         out = PIL.Image.frombytes("L", (self.width, sub_height), im_dilated.tobytes())
         out.save(out_file)
 
-        # close
-        # run("Options...", "iterations=5 count=1 black pad edm=8-bit do=Close stack");
-        im_closed = binary_closing(im_dilated/255,structure=np.ones((5,5)),iterations=5)
-        im_closed = (255*im_closed).astype(np.int8)
-        out_file = "closed_mask_after_dilation.tiff"
-        out = PIL.Image.frombytes("L", (self.width, sub_height), im_closed.tobytes())
-        out.save(out_file)
+        # # close
+        # # run("Options...", "iterations=5 count=1 black pad edm=8-bit do=Close stack");
+        # im_closed = binary_closing(im_dilated/255,structure=np.ones((5,5)),iterations=5)
+        # im_closed = (255*im_closed).astype(np.int8)
+        # out_file = "closed_mask_after_dilation.tiff"
+        # out = PIL.Image.frombytes("L", (self.width, sub_height), im_closed.tobytes())
+        # out.save(out_file)
 
 
         # vertical dilation down
@@ -278,7 +284,10 @@ class trench_kymograph():
         structure[6, 4] = 1
         structure[7, 4] = 1
         structure[8, 4] = 1
-        im_dilated = binary_dilation(im_closed,structure=structure, iterations=200)
+
+
+        # im_dilated = binary_dilation(im_closed,structure=structure, iterations=200)
+        im_dilated = binary_dilation(im_tip, structure=structure, iterations=200)
         im_dilated = (255*im_dilated).astype(np.int8)
         out_file = "dilated_mask_after_closing_down.tiff"
         out = PIL.Image.frombytes("L", (self.width, sub_height), im_dilated.tobytes())
@@ -323,13 +332,13 @@ class trench_kymograph():
         trench_dict = {}
         # create empty stacks for each trenches
         kymo_path = self.file_path + '/kymograph'
-        # self.get_file_list()
-        self.get_file_list(self.enhanced_path)
+        self.get_file_list()
+        # self.get_file_list(self.enhanced_path)
         if not os.path.exists(kymo_path):
             os.makedirs(kymo_path)
         for i in range(trench_num):
             cur_box = self.bbox_list[i]
-            print(self.ytop, cur_box[0], self.ybot,cur_box[1])
+            # print(self.ytop, cur_box[0], self.ybot,cur_box[1])
             trench_dict[i] = np.zeros((self.file_length, cur_box[1] - cur_box[0], cur_box[3] - cur_box[2]))
         for f_i in range(self.file_length):
             try:
@@ -350,12 +359,18 @@ class trench_kymograph():
             trench_dict[t_i] = None
         return
 
+    def clean_up(self):
+        shutil.rmtree(self.enhanced_path)
+        # shutil.rmtree(self.cropped_path)
+        return
+
     def run_kymo(self):
         self.get_file_list()
         self.background_enhance()
         self.auto_crop()
         self.mask_all_trenches()
         self.get_kymos()
+        self.clean_up()
         return
 
     @staticmethod
@@ -380,7 +395,7 @@ class trench_kymograph():
         hist_v = hist_v * 1. / len(data)
         # CDF
         cdf = hist_v.cumsum()
-        print(cdf)
+        # print(cdf)
         max_ent, threshold = 0, 0
         for i in range(len(cdf)):
         # for i in range(255):
@@ -433,7 +448,7 @@ if __name__ == "__main__":
                 new_kymo.run_kymo()
                 return
 
-            cores = multiprocessing.cpu_count()
+            cores = multiprocessing.cpu_count()/2
             jobs = []
             batch_num = len(poses)/cores + 1
 
@@ -446,10 +461,10 @@ if __name__ == "__main__":
                     j = multiprocessing.Process(target=helper_kymo, args=(p,))
                     jobs.append(j)
                     j.start()
-                    print(p, j.pid)
+                    # print(p, j.pid)
 
                 for job in jobs:
-                    print(job.pid)
+                    # print(job.pid)
                     job.join()
         time_elapsed = datetime.now() - start_t
         print('Time elapsed for extraction (hh:mm:ss.ms) {}'.format(time_elapsed))
@@ -478,15 +493,15 @@ if __name__ == "__main__":
     # run_kymo_generator(nd2_file, main_directory, lanes, poses, other_channels, seg_channel, trench_length, trench_width,
     #                    spatial, drift_correct)
     #
-    nd2_file = "H1.65.nd2"
-    main_directory =r"/Volumes/SysBio/PAULSSON LAB/Antoine Villa/Data Ti4/H1.65/"
-    lanes = [1] # has to be a list
-    poses = [1]  # second value exclusive
+    nd2_file = "VIBRIO_GC_30C_EXIT_DYNAMICS.nd2"
+    main_directory =r"/Volumes/SysBio/PAULSSON LAB/Leoncini/DATA_Ti4/20180616--VibrioGC_30C--The_Return/"
+    lanes = [2] # has to be a list
+    poses = range(1,55)  # second value exclusive
 
     channel = 'BF'
 
     # in pixels, measure in FIJI with a rectangle
-    trench_width = 24
+    trench_width = 28
 
     run_kymo_generator(nd2_file, main_directory, lanes, poses, channel, trench_width)
 
