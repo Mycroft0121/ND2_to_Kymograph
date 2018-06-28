@@ -96,6 +96,7 @@ class trench_kymograph():
         else:
             self.output_dir = self.file_path
 
+
     # TODO: change the path pattern if you didn't extract the ND2 with my extractor
     # Stack compatible
     def get_file_list(self, file_path=None, channel=None):
@@ -336,19 +337,16 @@ class trench_kymograph():
             all_channels = self.other_channels
         else:
             all_channels = [self.channel]
+        print(all_channels)
 
-
-
-
-
-
-        self.get_file_list()
+        # self.get_file_list()
         # self.get_file_list(self.enhanced_path)
         if not os.path.exists(kymo_path):
             os.makedirs(kymo_path)
 
         for c in all_channels:
             self.get_file_list(channel=c)
+            print(self.file_list)
             for i in range(trench_num):
                 cur_box = self.bbox_list[i]
                 # print(self.ytop, cur_box[0], self.ybot,cur_box[1])
@@ -449,7 +447,8 @@ class trench_kymograph():
 # test
 if __name__ == "__main__":
     def run_kymo_generator(nd2_file, main_directory, lanes, poses, channel, trench_width, frame_start=None,
-                           frame_limit=None):
+                           frame_limit=None, output_dir = None, file_path = None, other_channels = None):
+
 
         start_t = datetime.now()
         print('Kymo starts ')
@@ -458,7 +457,7 @@ if __name__ == "__main__":
         for lane in lanes:
             def helper_kymo(p):
                 new_kymo = trench_kymograph(nd2_file, main_directory, lane, p, channel, trench_width,
-                                            frame_start=None, frame_limit=None, output_dir=None, file_path=None)
+                                            frame_start, frame_limit, output_dir, file_path, other_channels)
                 new_kymo.run_kymo()
                 return
 
@@ -518,11 +517,12 @@ if __name__ == "__main__":
     # in pixels, measure in FIJI with a rectangle
     trench_width = 24
 
-    run_kymo_generator(nd2_file, main_directory, lanes, poses, channel, trench_width, other_channels)
+    # run_kymo_generator(nd2_file, main_directory, lanes, poses, channel, trench_width, other_channels)
 
     #
-    # new_kymo = trench_kymograph(nd2_file, main_directory, lane, pos, channel,  trench_width,frame_limit=50)
-    # # new_kymo.get_file_list()
+    new_kymo = trench_kymograph(nd2_file, main_directory, 1, 2, channel,  trench_width,frame_limit=50, other_channels=other_channels)
+    new_kymo.get_kymos()
+    # print(len(new_kymo.file_list))
     # # new_kymo.background_enhance()
     # new_kymo.auto_crop()
     # new_kymo.mask_all_trenches()
