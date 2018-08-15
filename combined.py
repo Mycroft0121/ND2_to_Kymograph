@@ -884,50 +884,6 @@ class trench_kymograph():
             hf_b.close()
         return
 
-    # def get_kymos_phase(self):
-    #     trench_num = len(self.bbox_list)
-    #     trench_dict = {}
-    #     # create empty stacks for each trenches
-    #     kymo_path = self.file_path + '/kymograph'
-    #     if self.other_channels:
-    #         self.other_channels.append(self.channel)
-    #         all_channels = self.other_channels
-    #     else:
-    #         all_channels = [self.channel]
-    #     print(all_channels)
-    #
-    #     # self.get_file_list()
-    #     # self.get_file_list(self.enhanced_path)
-    #     if not os.path.exists(kymo_path):
-    #         os.makedirs(kymo_path)
-    #
-    #     for c in all_channels:
-    #         self.get_file_list(channel=c)
-    #         print(self.file_list)
-    #         for i in range(trench_num):
-    #             cur_box = self.bbox_list[i]
-    #             # print(self.ytop, cur_box[0], self.ybot,cur_box[1])
-    #             trench_dict[i] = np.zeros((self.file_length, cur_box[1] - cur_box[0], cur_box[3] - cur_box[2]))
-    #         for f_i in range(self.file_length):
-    #             try:
-    #                 file_i = self.file_list[f_i]
-    #             except:
-    #                 print("something is wrong")
-    #                 continue
-    #             im_t = pl.imread(file_i)
-    #
-    #             for t_i in range(trench_num):
-    #                 cur_box = self.bbox_list[t_i]
-    #                 trench_dict[t_i][f_i] = im_t[cur_box[0]:self.ybot, cur_box[2]:cur_box[3]]
-    #
-    #         for t_i in range(trench_num):
-    #             trench_stack_name = kymo_path + "/Stack_Lane_" + str(self.lane).zfill(2) + "_pos_" + str(self.pos).zfill(
-    #                 3) + "_trench_" + str(t_i + 1).zfill(2) + "_top_c_" + c + ".tiff"
-    #
-    #             imsave(trench_stack_name, trench_dict[t_i].astype(np.uint16))
-    #             trench_dict[t_i] = None
-    #     return
-
     def clean_up(self):
         shutil.rmtree(self.enhanced_path)
 
@@ -957,9 +913,7 @@ class trench_kymograph():
                     h5_name = "Lane_" + str(self.lane).zfill(2) + "_pos_" + str(self.pos).zfill(3) + "_" + local[
                         self.spatial] + ".h5"
                     self.box_info.append(h5_name)
-
         os.chdir(self.file_path)
-        # kymo_path = self.file_path + '/Kymographs'
 
         kymo_path = os.path.join(self.main_path, self.prefix)
         kymo_path = kymo_path + "/Lane_" + str(self.lane)
@@ -1447,9 +1401,6 @@ if __name__ == "__main__":
     # main_directory =r"/Volumes/SysBio/PAULSSON LAB/Leoncini/DATA_Ti3//20180402--HYSTERESIS_ROBOT_RUN"
     #
     #
-    #
-    #
-    #
     # lanes = [1] # has to be a list
     # poses = range(2,66)  # second value exclusive
     #
@@ -1462,8 +1413,11 @@ if __name__ == "__main__":
     #
     #
     # spatial = 0       # 0 for top trench, 1 for bottom, 2 for both
-    # drift_correct = 1 # 1 for need correction, 0 for no
-    #
+    # drift_correct = 0 # 1 for need correction, 0 for no
+    # saving_option = 0
+    # clean_up = 1
+    # frame_start = None
+    # frame_limit = None
     #
     # # TODO: Don't touch me!
     # run_kymo_generator(nd2_file, main_directory, lanes, poses, other_channels, seg_channel,  trench_length, trench_width,
