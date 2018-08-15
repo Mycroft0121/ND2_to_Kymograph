@@ -38,23 +38,13 @@ from datetime import datetime
 import h5py
 from tifffile import imsave
 from skimage import filters
-from skimage import exposure
-from skimage import morphology
 from skimage import io as skio
-from skimage.segmentation import active_contour
-from skimage.feature import peak_local_max
+
 from skimage.filters import threshold_otsu
 from skimage.measure import label, regionprops
-from sklearn import linear_model
-from scipy.signal import medfilt, argrelextrema
-from scipy.misc import toimage
-from scipy.stats import mode
-from scipy import ndimage as ndi
-from scipy.ndimage.morphology import distance_transform_edt, binary_closing, binary_dilation
-from multiprocessing import Pool
-from skimage import util
+from scipy.signal import medfilt
+from scipy.ndimage.morphology import binary_dilation
 from PIL import Image, ImageEnhance
-from skimage.exposure import equalize_adapthist
 import shutil
 
 # todo: fix extractor xml file problem
@@ -202,7 +192,7 @@ class ND2_extractor():
 class trench_kymograph():
     def __init__(self, nd2_file, main_directory, lane, pos, channel, seg_channel, spatial,trench_length=None, trench_width=None,
                  drift_correct=0, find_correct=0, frame_start=None, frame_limit=None, output_dir=None,
-                 box_info=None, saving_option = 0, clean_up=1, chip_lenght=None, chip_width=None, magnification = None):
+                 box_info=None, saving_option = 0, clean_up=1, chip_length=None, chip_width=None, magnification = None):
     # def __init__(self, nd2_file, main_directory, lane, pos, channel, seg_channel, trench_length, trench_width,
     #              spatial,
     #              drift_correct=0, find_correct=0, frame_start=None, frame_limit=None, output_dir=None,
@@ -255,10 +245,10 @@ class trench_kymograph():
         self.saving_option = saving_option  # 0 for stack, 1 for kymo, 2 for both, default only save stacks
         self.clean = clean_up # whether delete enhanced/cropped, default yes
 
-        self.chip_length = chip_lenght
+        self.chip_length = chip_length
         self.chip_width  = chip_width
 
-        # 6.5 the magic number
+        # 6.5 is the magic number for Ti3, Ti4
         if ((self.trench_length and self.chip_length) is None) or ((self.trench_width and self.chip_width) is None):
             print("Error: trench dimension not specified")
             exit()
@@ -266,12 +256,14 @@ class trench_kymograph():
             if not self.magnification:
                 print("Error: magnification not specified")
                 exit()
-            self.trench_length = self.chip_length/6.5*self.magnification
+            self.trench_length = int(self.chip_length/6.5*self.magnification)
         if not self.trench_width:
             if not self.magnification:
                 print("Error: magnification not specified")
                 exit()
-            self.trench_width = self.chip_width/6.5*self.magnification
+            self.trench_width = int((self.chip_width/6.5*self.magnification))
+            if self.seg_channel != 'BF':   # if not phase contrast, dilate trench width
+                self.trench_width *= 1.2
 
         # TODO: change the path pattern if you didn't extract the ND2 with my extractor
         self.file_path = self.main_path + "/" + self.prefix + "/Lane_" + str(self.lane).zfill(2) + "/pos_" + str(
@@ -968,11 +960,22 @@ class trench_kymograph():
 
         os.chdir(self.file_path)
         # kymo_path = self.file_path + '/Kymographs'
-        kymo_path = self.file_path + '/Kymographs'
-        # print(kymo_path)
-        # print(os.path.exists(kymo_path))
+
+        kymo_path = os.path.join(self.main_path, self.prefix)
+        kymo_path = kymo_path + "/Lane_" + str(self.lane)
         if not os.path.exists(kymo_path):
             os.makedirs(kymo_path)
+
+        kymo_path = kymo_path + "/pos_" + str(self.pos)
+        if not os.path.exists(kymo_path):
+            os.makedirs(kymo_path)
+
+        kymo_path_stack = os.path.join(kymo_path, "Stack")
+        kymo_path_kymo = os.path.join(kymo_path, "Kymograph")
+        if not os.path.exists(kymo_path_stack):
+            os.makedirs(kymo_path_stack)
+        if not os.path.exists(kymo_path_kymo):
+            os.makedirs(kymo_path_kymo)
 
         for ii in range(len(self.box_info)):
             hf = h5py.File(self.box_info[ii], 'r')
@@ -1010,26 +1013,33 @@ class trench_kymograph():
                             all_kymo[t_i][f_i] = trench.astype(np.uint16)
 
                     for t_i in range(trench_num):
-                        if i == 0:
-                            trench_name = kymo_path + "/Lane_" + str(self.lane).zfill(
-                                2) + "_pos_" + str(
-                                self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(2) + "_top_c_"+ self.channel+".tiff"
-                            trench_name_stack = kymo_path + "/Stack_Lane_" + str(self.lane).zfill(
-                                2) + "_pos_" + str(
-                                self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(2) + "_top_c_" + self.channel + ".tiff"
-                        else:
-                            trench_name = kymo_path + "/Lane_" + str(self.lane).zfill(
-                                2) + "_pos_" + str(
-                                self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(2) + "_bottom_c_"+ self.channel+".tiff"
-                            trench_name_stack = kymo_path + "/Stack_Lane_" + str(self.lane).zfill(
-                                2) + "_pos_" + str(
-                                self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(
-                                2) + "_bottom_c_" + self.channel + ".tiff"
-                        imsave(trench_name_stack,all_kymo[t_i].astype(np.uint16))
-                        this_kymo = np.concatenate(all_kymo[t_i], axis=1).astype(np.uint16)
+                        if "_top" in self.box_info[ii]:  # top trench
+                            if self.saving_option !=0:  # save kymo
+                                trench_name = kymo_path_kymo + "/Kymo_Lane_" + str(self.lane).zfill(
+                                    2) + "_pos_" + str(
+                                    self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(2) + "_top_c_"+ self.channel+".tiff"
+                            if self.saving_option !=1: # save stacks
+                                trench_name_stack = kymo_path_stack + "/Stack_Lane_" + str(self.lane).zfill(
+                                    2) + "_pos_" + str(
+                                    self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(2) + "_top_c_" + self.channel + ".tiff"
+                        else:   # bottom trench
+                            if self.saving_option != 0:  # save kymo
+                                trench_name = kymo_path + "/Kymo_Lane_" + str(self.lane).zfill(
+                                    2) + "_pos_" + str(
+                                    self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(2) + "_bottom_c_"+ self.channel+".tiff"
+                            if self.saving_option != 1: # save stack
+                                trench_name_stack = kymo_path + "/Stack_Lane_" + str(self.lane).zfill(
+                                    2) + "_pos_" + str(
+                                    self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(
+                                    2) + "_bottom_c_" + self.channel + ".tiff"
+                        # TODO
+                        if self.saving_option != 1:  # save stacks
+                            imsave(trench_name_stack,all_kymo[t_i].astype(np.uint16))
+                        if self.saving_option != 0:  # save kymo
+                            this_kymo = np.concatenate(all_kymo[t_i], axis=1).astype(np.uint16)
+                            out = PIL.Image.frombytes("I;16", (this_kymo.shape[1], this_kymo.shape[0]), this_kymo.tobytes())
+                            out.save(trench_name)
                         all_kymo[t_i] = None
-                        out = PIL.Image.frombytes("I;16", (this_kymo.shape[1], this_kymo.shape[0]), this_kymo.tobytes())
-                        out.save(trench_name)
                 else:
                     print("no trenches detected")
             else: # segmented with phase
@@ -1113,12 +1123,10 @@ class trench_kymograph():
                                                           this_kymo.tobytes())
                                 out.save(trench_kymo_name)
                             trench_dict[t_i] = None
-
-
         return
 
     def run_kymo(self):
-        if self.seg_channel !='BF':
+        if self.seg_channel != 'BF':
             self.get_file_list()
             # identify
             if self.find_correct == 1:
@@ -1349,7 +1357,7 @@ if __name__ == "__main__":
     #                  box_info=None, saving_option = 0, clean_up=1, chip_lenght=None, chip_width=None, magnification = None)
     def run_kymo_generator(nd2_file, main_directory, lanes, poses, other_channels, seg_channel,  trench_length, trench_width,
                            spatial, drift_correct, frame_start=None, frame_limit=None, output_dir=None, box_info=None,
-                           saving_option = 0, clean_up=1, chip_lenght=None, chip_width=None, magnification = None):
+                           saving_option = 0, clean_up=1, chip_length=None, chip_width=None, magnification = None):
 
         start_t = datetime.now()
         print('Kymo starts ')
@@ -1360,7 +1368,7 @@ if __name__ == "__main__":
             find_correct = 1
             new_kymo = trench_kymograph(nd2_file, main_directory, lane, pos, channel, seg_channel,spatial, trench_length,
                                         trench_width,  drift_correct, find_correct, frame_start, frame_limit,
-                                        output_dir, box_info, saving_option, clean_up, chip_lenght, chip_width, magnification)
+                                        output_dir, box_info, saving_option, clean_up, chip_length, chip_width, magnification)
             new_kymo.run_kymo()
 
         # trench identify for each pos
@@ -1369,7 +1377,7 @@ if __name__ == "__main__":
             def helper_kymo(p):
                 new_kymo = trench_kymograph(nd2_file, main_directory, lane, pos, channel, seg_channel,spatial, trench_length,
                                             trench_width,  drift_correct, find_correct, frame_start, frame_limit,
-                                            output_dir, box_info, saving_option, clean_up, chip_lenght, chip_width, magnification)
+                                            output_dir, box_info, saving_option, clean_up, chip_length, chip_width, magnification)
                 new_kymo.run_kymo()
                 return 0
 
@@ -1399,7 +1407,7 @@ if __name__ == "__main__":
                 def helper_kymo(p):
                     new_kymo = trench_kymograph(nd2_file, main_directory, lane, pos, channel, seg_channel,spatial, trench_length,
                                                 trench_width,  drift_correct, find_correct, frame_start, frame_limit, output_dir,
-                                                box_info, saving_option, clean_up, chip_lenght, chip_width, magnification)
+                                                box_info, saving_option, clean_up, chip_length, chip_width, magnification)
                     new_kymo.run_kymo()
 
                 cores = multiprocessing.cpu_count()
@@ -1459,7 +1467,7 @@ if __name__ == "__main__":
     #
     # # TODO: Don't touch me!
     # run_kymo_generator(nd2_file, main_directory, lanes, poses, other_channels, seg_channel,  trench_length, trench_width,
-    #                            spatial, drift_correct, frame_start=None, frame_limit=None, output_dir=None, box_info=None,
-    #                            saving_option = 0, clean_up=1, chip_lenght=None, chip_width=None, magnification = None)
+    #                            spatial, drift_correct, frame_start, frame_limit, output_dir, box_info,
+    #                            saving_option, clean_up, chip_length, chip_width, magnification)
     #
 
