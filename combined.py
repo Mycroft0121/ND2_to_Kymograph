@@ -1412,6 +1412,7 @@ if __name__ == "__main__":
     # trench_width = 30 # has to be even
     #
     #
+    # # Some default parameters, change accordingly
     # spatial = 0       # 0 for top trench, 1 for bottom, 2 for both
     # drift_correct = 0 # 1 for need correction, 0 for no
     # saving_option = 0
