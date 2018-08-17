@@ -927,16 +927,13 @@ class trench_kymograph():
         return
 
     def run_kymo_phase(self):
+        self.get_file_list()
         self.background_enhance()
         self.auto_crop()
         self.mask_all_trenches()
-        # self.get_file_list()
-        # self.background_enhance()
-        # self.auto_crop()
-        # self.mask_all_trenches()
-        # self.kymograph()
-        # if self.clean:
-        #     self.clean_up()
+        self.kymograph()
+        if self.clean:
+            self.clean_up()
         return
 
     def kymograph(self):
