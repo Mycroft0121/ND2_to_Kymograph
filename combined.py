@@ -305,7 +305,7 @@ class trench_kymograph():
                 # for newly extracted
                 # sub_name = name.split('_Time_')[1]
                 # for previously extracted, may also need change if you have "_t" in your file name
-                sub_name = name.split('_t')[1]
+                sub_name = name.split('_Time_')[1]
                 num = sub_name.split('_c')[0]
                 return int(num)
 
@@ -927,13 +927,16 @@ class trench_kymograph():
         return
 
     def run_kymo_phase(self):
-        self.get_file_list()
         self.background_enhance()
         self.auto_crop()
         self.mask_all_trenches()
-        self.kymograph()
-        if self.clean:
-            self.clean_up()
+        # self.get_file_list()
+        # self.background_enhance()
+        # self.auto_crop()
+        # self.mask_all_trenches()
+        # self.kymograph()
+        # if self.clean:
+        #     self.clean_up()
         return
 
     def kymograph(self):
@@ -965,13 +968,13 @@ class trench_kymograph():
             os.makedirs(kymo_path)
         except OSError:
             pass
-        if self.saving_option != 1:
+        if self.saving_option != 0:
             kymo_path_stack = os.path.join(kymo_path, "Stack")
             try:
                 os.makedirs(kymo_path_stack)
             except OSError:
                 pass
-        if self.saving_option != 0:
+        if self.saving_option != 1:
             kymo_path_kymo = os.path.join(kymo_path, "Kymograph")
 
             try:
@@ -1000,7 +1003,8 @@ class trench_kymograph():
                             continue
 
                         im_t = pl.imread(file_i)
-                        if self.drift_correct == 1:
+                        if self.found_drift == 1:
+                            self.read_drift()
                             # correct for drift
                             move_x = self.drift_x[f_i]
                             move_y = self.drift_y[f_i]
@@ -1389,7 +1393,7 @@ if __name__ == "__main__":
                     new_kymo.run_kymo()
                     return 0
 
-                cores = multiprocessing.cpu_count()
+                cores = int(multiprocessing.cpu_count()*0.8)
                 jobs = []
                 batch_num = len(poses)/cores + 1
 
@@ -1417,7 +1421,7 @@ if __name__ == "__main__":
                                                     box_info, saving_option, clean_up, chip_length, chip_width, magnification)
                         new_kymo.run_kymo()
 
-                    cores = multiprocessing.cpu_count()
+                    cores = int(multiprocessing.cpu_count()*0.8)
                     jobs = []
                     batch_num = len(poses) / cores + 1
 
@@ -1450,7 +1454,7 @@ if __name__ == "__main__":
                     new_kymo.run_kymo()
                     return 0
 
-                cores = multiprocessing.cpu_count()
+                cores = int(multiprocessing.cpu_count()*0.8)
                 jobs = []
                 batch_num = len(poses)/cores + 1
 
@@ -1478,7 +1482,7 @@ if __name__ == "__main__":
                                                     box_info, saving_option, clean_up, chip_length, chip_width, magnification)
                         new_kymo.run_kymo()
 
-                    cores = multiprocessing.cpu_count()
+                    cores = int(multiprocessing.cpu_count()*0.8)
                     jobs = []
                     batch_num = len(poses) / cores + 1
 
@@ -1505,53 +1509,58 @@ if __name__ == "__main__":
 
 
 
-    # nd2_file = "PERSISTER_GC_LONG_STATIONARY_PART2.nd2"
-    # #
-    # file_directory = r"/Volumes/SysBio/PAULSSON LAB/Leoncini/DATA_Ti4/20180705--PERSISTER_GC/"
+    nd2_file = "HYSTERESIS_GC_192WP.nd2"
+    #
+    file_directory = r"/Volumes/SysBio/PAULSSON LAB/Leoncini/DATA_Ti3/20180724--HYSTERESIS_GC--192wells/"
+    #
     # new_extractor = ND2_extractor(nd2_file, file_directory)
     # new_extractor.run_extraction()
-    #
-    # TODO: Change me
-    nd2_file = "40x_Ph2_Test_1.7.nd2"
+
+
+
     # #
-    main_directory = r"/Volumes/SysBio/PAULSSON LAB/Somenath/DATA_Ti3/20180731/"
-    lanes = range(1,5)  # has to be a list
-    poses = range(1, 41)  # second value exclusive
+    # # TODO: Change me
+    # nd2_file = "40x_Ph2_Test_1.7.nd2"
+    # # #
+    # main_directory = r"/Volumes/SysBio/PAULSSON LAB/Somenath/DATA_Ti3/20180731/"
+    lanes = range(1,2)  # has to be a list
+    poses = range(1, 68)  # second value exclusive
 
-    seg_channel = 'BF'
+    seg_channel = 'RFP'
 
-    other_channels = [] # has to be a list
+    other_channels = ['GFP','Phase'] # has to be a list
 
     # in pixels, measure in FIJI with a rectangle
-    trench_width = 16
+    trench_width = 18
 
     # other_channels = ['GFP']
-    trench_length = 280
-    spatial = 0
-    frame_start = 7
+    trench_length = 250
+    spatial = 2 #0=TOP, 1=BOTTOM, 2= TOP & BOTTOM
+    frame_start = 1
     # in pixels, measure in FIJI with a rectangle
     #trench_length = 330
     #trench_width = 30 # has to be even
-
-
+    #
+    #
     # Some default parameters, change accordingly
-    # correct_drift = 0
-    # found_drift = 0
-    # frame_start = None
-    # frame_limit = None
-    # output_dir = None
-    # box_info = None
-    # saving_option = 0
-    # clean_up = 1
-    # chip_length = None
-    # chip_width = None
-    # magnification = None
-    # TODO: Don't touch me!
-    run_kymo_generator(nd2_file, main_directory, lanes, poses, other_channels, seg_channel,  trench_length, trench_width,
-                               spatial, frame_start=frame_start)
-
-    ### use this if changed default parameters
+    correct_drift = 0
+    found_drift = 0
+    frame_start = None
+    frame_limit = None
+    output_dir = None
+    box_info = None
+    saving_option = 0
+    clean_up = 1
+    chip_length = None
+    chip_width = None
+    magnification = None
+    # # TODO: Don't touch me!
     # run_kymo_generator(nd2_file, main_directory, lanes, poses, other_channels, seg_channel,  trench_length, trench_width,
-    #                            spatial, correct_drift, frame_start, frame_limit, output_dir, box_info,
-    #                            saving_option, clean_up, chip_length, chip_width, magnification)
+    #                            spatial, frame_start=frame_start)
+    #
+    ## use this if changed default parameters
+    run_kymo_generator(nd2_file, file_directory, lanes, poses, other_channels, seg_channel,  trench_length, trench_width,
+                               spatial, correct_drift, frame_start, frame_limit, output_dir, box_info,
+                               saving_option, clean_up, chip_length, chip_width, magnification)
+    #
 
