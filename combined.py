@@ -968,13 +968,13 @@ class trench_kymograph():
             os.makedirs(kymo_path)
         except OSError:
             pass
-        if self.saving_option != 0:
+        if self.saving_option != 1:
             kymo_path_stack = os.path.join(kymo_path, "Stack")
             try:
                 os.makedirs(kymo_path_stack)
             except OSError:
                 pass
-        if self.saving_option != 1:
+        if self.saving_option != 0:
             kymo_path_kymo = os.path.join(kymo_path, "Kymograph")
 
             try:
@@ -1364,7 +1364,7 @@ if __name__ == "__main__":
                            saving_option = 0, clean_up=1, chip_length=None, chip_width=None, magnification = None):
 
         start_t = datetime.now()
-        print('Kymo starts ')
+        print('Kymo starts at ',datetime.now())
 
         # if need to do drift correction
         if correct_drift == 1:
