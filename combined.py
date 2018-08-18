@@ -246,6 +246,7 @@ class trench_kymograph():
         self.chip_length = chip_length
         self.chip_width  = chip_width
 
+        print("saving option",self.saving_option)
         # 6.5 is the magic number for Ti3, Ti4
         if ((self.trench_length or self.chip_length) is None) or ((self.trench_width or self.chip_width) is None):
             print("Error: trench dimension not specified")
@@ -260,7 +261,7 @@ class trench_kymograph():
                 print("Error: magnification not specified")
                 #exit()
             self.trench_width = int((self.chip_width/6.5*self.magnification))
-            if self.seg_channel != 'BF':   # if not phase contrast, dilate trench width
+            if self.seg_channel !='BF' or self.seg_channel !='Phase':   # if not phase contrast, dilate trench width
                 self.trench_width *= 1.2
 
         # TODO: change the path pattern if you didn't extract the ND2 with my extractor
@@ -940,7 +941,7 @@ class trench_kymograph():
         return
 
     def kymograph(self):
-        if self.seg_channel != 'BF':
+        if self.seg_channel != 'BF' or self.seg_channel != 'Phase':
             if self.box_info is None:
                 self.box_info = []
                 if self.spatial == 2:
@@ -984,7 +985,7 @@ class trench_kymograph():
 
         for ii in range(len(self.box_info)):
             hf = h5py.File(self.box_info[ii], 'r')
-            if self.seg_channel !='BF':
+            if self.seg_channel !='BF' or self.seg_channel !='Phase':
                 ind_list = hf.get('box').value
                 upper_index = hf.get('upper_index').value
                 lower_index = hf.get('lower_index').value + 20
@@ -1132,7 +1133,7 @@ class trench_kymograph():
         return
 
     def run_kymo(self):
-        if self.seg_channel != 'BF':
+        if self.seg_channel != 'BF' or self.seg_channel != 'Phase':
             self.get_file_list()
             # identify
             if self.correct_drift == 1:
@@ -1362,7 +1363,7 @@ if __name__ == "__main__":
     def run_kymo_generator(nd2_file, main_directory, lanes, poses, other_channels, seg_channel,  trench_length, trench_width,
                            spatial, correct_drift=0, found_drift = 0, frame_start=None, frame_limit=None, output_dir=None, box_info=None,
                            saving_option = 0, clean_up=1, chip_length=None, chip_width=None, magnification = None):
-
+        print("wtf ", saving_option)
         start_t = datetime.now()
         print('Kymo starts at ',datetime.now())
 
@@ -1560,7 +1561,9 @@ if __name__ == "__main__":
     #
     ## use this if changed default parameters
     run_kymo_generator(nd2_file, file_directory, lanes, poses, other_channels, seg_channel,  trench_length, trench_width,
-                               spatial, correct_drift, frame_start, frame_limit, output_dir, box_info,
+                               spatial, correct_drift,found_drift, frame_start, frame_limit, output_dir, box_info,
                                saving_option, clean_up, chip_length, chip_width, magnification)
     #
-
+    #  nd2_file, main_directory, lane, pos, channel, seg_channel, spatial,trench_length=None, trench_width=None,
+    #                 correct_drift=0, found_drift = 0, frame_start=None, frame_limit=None, output_dir=None,
+    #                  box_info=None, saving_option = 0, clean_up=1, chip_length=None, chip_width=None, magnification = None)
