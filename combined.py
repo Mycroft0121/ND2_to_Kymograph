@@ -246,7 +246,6 @@ class trench_kymograph():
         self.chip_length = chip_length
         self.chip_width  = chip_width
 
-        print("saving option",self.saving_option)
         # 6.5 is the magic number for Ti3, Ti4
         if ((self.trench_length or self.chip_length) is None) or ((self.trench_width or self.chip_width) is None):
             print("Error: trench dimension not specified")
@@ -332,7 +331,7 @@ class trench_kymograph():
             return pl.imread(self.file_list[i])
 
     def find_drift(self):
-        lane_path = self.main_path + "/" + self.prefix + "/Lane_" + str(self.lane).zfill(2)
+        lane_path = self.file_path
         tops = []
         peaks = []
         file_num = len(self.file_list)
@@ -357,9 +356,7 @@ class trench_kymograph():
         drift_y.write(' '.join(map(str, y_shift)))
         # print(y_shift)
 
-
         x_shift = [0]
-
         for i in range(file_num - 1):
             list_a = peaks[i]
             list_b = peaks[i + 1]
@@ -381,7 +378,8 @@ class trench_kymograph():
     def read_drift(self):
         self.drift_x_txt = 'drift_x.txt'
         self.drift_y_txt = 'drift_y.txt'
-        lane_path = self.main_path + "/" + self.prefix + "/Lane_" + str(self.lane).zfill(2)
+        lane_path = self.file_path
+        # lane_path = self.main_path + "/" + self.prefix + "/Lane_" + str(self.lane).zfill(2)
         self.drift_x_txt = lane_path + "/" + self.drift_x_txt
         self.drift_y_txt = lane_path + "/" + self.drift_y_txt
         # read files into np array
@@ -445,12 +443,14 @@ class trench_kymograph():
         frame_num = len(self.file_list)
         # using the 85 percentile of the intensity of the first 50 frames as the meta-representation
         im_stack = np.zeros((min(50, frame_num), self.height, self.width))
+        if self.found_drift:
+            self.read_drift()
         for i in range(min(50, frame_num)):
             im_i = pl.imread(self.file_list[i])
             if np.max(im_i) > 255:
                 im_i = self.to_8_bit(im_i)
             if self.found_drift== 1:
-                self.read_drift()
+
                 # correct for drift
                 move_x = self.drift_x[i]
                 temp = np.zeros((self.height, self.width))
@@ -462,11 +462,12 @@ class trench_kymograph():
 
             im_stack[i] = im_i
         perc = np.percentile(im_stack, 85, axis=0).astype(np.uint8)
-        out_file = "perc_85_frame_50.tiff"
+        out_file = "perc_85_frame_50_new.tiff"
 
         # convert to 8-bit, using the imageJ way
         out = PIL.Image.frombytes("L", (self.width, self.height), perc.tobytes())
         out.save(out_file)
+
 
         # identify tops & bottoms
         x_per = np.percentile(perc, 90, axis=1)
@@ -489,29 +490,6 @@ class trench_kymograph():
             top = bottom - self.trench_length - 60
             self.tops.append(top)
             self.bottoms.append(bottom)
-
-
-        # if self.spatial == 0:  # top
-        #     top = np.where(intensity_scan > 0.2)[0][0] - 30
-        #     bottom = top + self.trench_length + 60
-        #     self.tops.append(top)
-        #     self.bottoms.append(bottom)
-        # elif self.spatial == 1:  # bottom
-        #     bottom = np.where(intensity_scan > 0.2)[0][-1] + 30
-        #     top = bottom - self.trench_length - 60
-        #     self.tops.append(top)
-        #     self.bottoms.append(bottom)
-        # else:  # both
-        #     # top one
-        #     top = np.where(intensity_scan > 0.2)[0][0] - 30
-        #     bottom = top + self.trench_length + 60
-        #     self.tops.append(top)
-        #     self.bottoms.append(bottom)
-        #     # bottom one
-        #     bottom = np.where(intensity_scan > 0.2)[0][-1] + 30
-        #     top = bottom - self.trench_length - 60
-        #     self.tops.append(top)
-        #     self.bottoms.append(bottom)
 
         # identify trenches
         peak_ind_dict = {}
@@ -928,16 +906,16 @@ class trench_kymograph():
         return
 
     def run_kymo_phase(self):
-        self.background_enhance()
-        self.auto_crop()
-        self.mask_all_trenches()
-        # self.get_file_list()
         # self.background_enhance()
         # self.auto_crop()
         # self.mask_all_trenches()
-        # self.kymograph()
-        # if self.clean:
-        #     self.clean_up()
+        self.get_file_list()
+        self.background_enhance()
+        self.auto_crop()
+        self.mask_all_trenches()
+        self.kymograph()
+        if self.clean:
+            self.clean_up()
         return
 
     def kymograph(self):
@@ -962,18 +940,21 @@ class trench_kymograph():
         try:
             os.makedirs(kymo_path)
         except OSError:
+            print("?")
             pass
 
         kymo_path = kymo_path + "/pos_" + str(self.pos).zfill(3)
         try:
             os.makedirs(kymo_path)
         except OSError:
+            print("??")
             pass
         if self.saving_option != 1:
             kymo_path_stack = os.path.join(kymo_path, "Stack")
             try:
                 os.makedirs(kymo_path_stack)
             except OSError:
+                print("???")
                 pass
         if self.saving_option != 0:
             kymo_path_kymo = os.path.join(kymo_path, "Kymograph")
@@ -981,6 +962,7 @@ class trench_kymograph():
             try:
                 os.makedirs(kymo_path_kymo)
             except OSError:
+                print("????")
                 pass
 
         for ii in range(len(self.box_info)):
@@ -1135,15 +1117,20 @@ class trench_kymograph():
     def run_kymo(self):
         if self.seg_channel != 'BF' or self.seg_channel != 'Phase':
             self.get_file_list()
+            if self.channel == self.seg_channel:
+                if self.correct_drift == 1:
+                    self.find_drift()
+                self.get_trenches()
+            self.kymograph()
             # identify
-            if self.correct_drift == 1:
-                self.find_drift()
-            else:
-                if self.channel == self.seg_channel:
-                    self.get_trenches()
-                    self.kymograph()
-                else:
-                    self.kymograph()
+            # if self.correct_drift == 1:
+            #     self.find_drift()
+            # else:
+            #     if self.channel == self.seg_channel:
+            #         self.get_trenches()
+                #     self.kymograph()
+                # else:
+                #     self.kymograph()
         else:
             self.run_kymo_phase()
         return
@@ -1357,34 +1344,18 @@ class trench_kymograph():
 # test
 if __name__ == "__main__":
 
+
     # nd2_file, main_directory, lane, pos, channel, seg_channel, spatial, trench_length = None, trench_width = None,
     # correct_drift = 0, found_drift = 0, frame_start = None, frame_limit = None, output_dir = None,
     # box_info = None, saving_option = 0, clean_up = 1, chip_length = None, chip_width = None, magnification = None)
     def run_kymo_generator(nd2_file, main_directory, lanes, poses, other_channels, seg_channel,  trench_length, trench_width,
                            spatial, correct_drift=0, found_drift = 0, frame_start=None, frame_limit=None, output_dir=None, box_info=None,
                            saving_option = 0, clean_up=1, chip_length=None, chip_width=None, magnification = None):
-        print("wtf ", saving_option)
-        start_t = datetime.now()
-        print('Kymo starts at ',datetime.now())
 
+        start_t = datetime.now()
+        print("Kymo starts at ", start_t)
         # if need to do drift correction
         if correct_drift == 1:
-            # drift correct for each lane:
-            for lane in lanes:
-                pos = poses[0]
-                channel = seg_channel
-                find_correct = 1
-                new_kymo = trench_kymograph(nd2_file, main_directory, lane, pos, channel, seg_channel,spatial, trench_length,
-                                            trench_width, correct_drift, found_drift, frame_start, frame_limit,
-                                            output_dir, box_info, saving_option, clean_up, chip_length, chip_width, magnification)
-                new_kymo.run_kymo()
-
-            # trench identify for each pos
-
-            # drift already found
-            found_drift = 1
-            correct_drift = 0
-
             for lane in lanes:
                 channel = seg_channel
                 def helper_kymo(p):
@@ -1412,7 +1383,7 @@ if __name__ == "__main__":
                     for job in jobs:
                         print(job.pid)
                         job.join()
-
+            found_drift = 1
             for lane in lanes:
                 for channel in other_channels:
                     print("lane channel ", lane, channel)
@@ -1471,7 +1442,7 @@ if __name__ == "__main__":
                         print(p, j.pid)
 
                     for job in jobs:
-                        print(job.pid)
+                        # print(job.pid)
                         job.join()
 
             for lane in lanes:
@@ -1499,7 +1470,7 @@ if __name__ == "__main__":
                             print(p, j.pid)
 
                         for job in jobs:
-                            print(job.pid)
+                            # print(job.pid)
                             job.join()
 
                 print("woohoo")
@@ -1525,14 +1496,15 @@ if __name__ == "__main__":
     # # #
     # main_directory = r"/Volumes/SysBio/PAULSSON LAB/Somenath/DATA_Ti3/20180731/"
     lanes = range(1,2)  # has to be a list
-    poses = range(1, 68)  # second value exclusive
+    # poses = range(4,68)
+    poses = range(1, 67)  # second value exclusive
 
     seg_channel = 'RFP'
 
     other_channels = ['GFP','Phase'] # has to be a list
 
     # in pixels, measure in FIJI with a rectangle
-    trench_width = 18
+    trench_width = 20
 
     # other_channels = ['GFP']
     trench_length = 250
@@ -1544,13 +1516,13 @@ if __name__ == "__main__":
     #
     #
     # Some default parameters, change accordingly
-    correct_drift = 0
+    correct_drift = 1
     found_drift = 0
     frame_start = None
     frame_limit = None
     output_dir = None
     box_info = None
-    saving_option = 0
+    saving_option =0
     clean_up = 1
     chip_length = None
     chip_width = None
@@ -1561,8 +1533,9 @@ if __name__ == "__main__":
     #
     ## use this if changed default parameters
     run_kymo_generator(nd2_file, file_directory, lanes, poses, other_channels, seg_channel,  trench_length, trench_width,
-                               spatial, correct_drift,found_drift, frame_start, frame_limit, output_dir, box_info,
+                               spatial, correct_drift, found_drift,frame_start, frame_limit, output_dir, box_info,
                                saving_option, clean_up, chip_length, chip_width, magnification)
+
     #
     #  nd2_file, main_directory, lane, pos, channel, seg_channel, spatial,trench_length=None, trench_width=None,
     #                 correct_drift=0, found_drift = 0, frame_start=None, frame_limit=None, output_dir=None,
