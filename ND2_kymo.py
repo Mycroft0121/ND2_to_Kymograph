@@ -425,7 +425,7 @@ class trench_kymograph():
         return new_peak
 
     def peak_correct(self, old_peak, im_intensity):
-        half_trench_width = self.trench_width/2
+        half_trench_width = int(self.trench_width/2)
         new_peaks = [old_peak[0]]
         for p in old_peak[1:-1]:
             half_p_height = int(im_intensity[p]/2) # int
