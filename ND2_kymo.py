@@ -17,8 +17,6 @@
 import matplotlib.pyplot as pl
 import glob  # pathname pattern
 from PIL import Image
-
-# from ND2 extractor
 import nd2reader
 import os
 import PIL
@@ -58,63 +56,68 @@ class ND2_extractor():
         self.pos_dict = None
         self.pos_offset = None
         self.lane_dict = None
+        self.single_pos = False
 
     def lane_info(self):
         # dict for lane info
         nd2_new = ND2_Reader(self.nd2_file)
-        nd2_new.iter_axes = 'm'
+        # first check if there are multiple positions
         lane_dict = {}
         lane_dict[0] = 1
         pos_offset = {}
         cur_lane = 1
         pos_min = 0
         pos_offset[cur_lane] = pos_min - 1
-        y_prev = nd2_new[0].metadata['y_um']
-        pos_num = len(nd2_new)
-        for i in range(1, pos_num):
-            f = nd2_new[i]
-            y_now = f.metadata['y_um']
-            if abs(y_now - y_prev) > 200:  # a new lane
-                cur_lane += 1
-                pos_min = i - 1
-                pos_offset[cur_lane] = pos_min
-            lane_dict[i] = cur_lane
-            y_prev = y_now
-        nd2_new.close()
+        if 'm' in nd2_new.axes:
+            nd2_new.iter_axes = 'm'
+            y_prev = nd2_new[0].metadata['y_um']
+            pos_num = len(nd2_new)
+            for i in range(1, pos_num):
+                f = nd2_new[i]
+                y_now = f.metadata['y_um']
+                if abs(y_now - y_prev) > 200:  # a new lane
+                    cur_lane += 1
+                    pos_min = i - 1
+                    pos_offset[cur_lane] = pos_min
+                lane_dict[i] = cur_lane
+                y_prev = y_now
+            nd2_new.close()
+        else:
+            self.single_pos = True      # TODO: maybe unnecessary
         self.lane_dict = lane_dict
         self.pos_offset = pos_offset
 
-    def pos_info(self):
-        cur_dir = os.getcwd()
-        os.chdir(self.xml_dir)
-        tree = ET.ElementTree(file=self.xml_file)
-        root = tree.getroot()[0]
-        pos_dict = {}
-        lane_dict = {}
-        pos_offset = {}
-        lane_count = 0
-        lane_name_prev = None
-        dummy_count = 0
-        for i in root:
-            if i.tag.startswith('Point'):
-                ind = int(i.tag[5:])
-                pos_name = i[1].attrib['value']
-                if len(pos_name) < 1:
-                    pos_name = "dummy_" + str(dummy_count)
-                    dummy_count += 1
-                    lane_name_cur = "dummy"
-                else:
-                    lane_name_cur = re.match(r'\w', pos_name).group()
-                if lane_name_cur != lane_name_prev:
-                    lane_name_prev = lane_name_cur
-                    lane_count += 1
-                    pos_offset[lane_count] = ind - 1
-                lane_dict[ind] = lane_count
-                pos_dict[ind] = pos_name
-        os.chdir(cur_dir)
-        self.pos_dict = pos_dict
-        self.lane_dict = lane_dict
-        self.pos_offset = pos_offset
+    # def pos_info(self):
+    #     cur_dir = os.getcwd()
+    #     os.chdir(self.xml_dir)
+    #     tree = ET.ElementTree(file=self.xml_file)
+    #     root = tree.getroot()[0]
+    #     pos_dict = {}
+    #     lane_dict = {}
+    #     pos_offset = {}
+    #     lane_count = 0
+    #     lane_name_prev = None
+    #     dummy_count = 0
+    #     for i in root:
+    #         if i.tag.startswith('Point'):
+    #             ind = int(i.tag[5:])
+    #             pos_name = i[1].attrib['value']
+    #             if len(pos_name) < 1:
+    #                 pos_name = "dummy_" + str(dummy_count)
+    #                 dummy_count += 1
+    #                 lane_name_cur = "dummy"
+    #             else:
+    #                 lane_name_cur = re.match(r'\w', pos_name).group()
+    #             if lane_name_cur != lane_name_prev:
+    #                 lane_name_prev = lane_name_cur
+    #                 lane_count += 1
+    #                 pos_offset[lane_count] = ind - 1
+    #             lane_dict[ind] = lane_count
+    #             pos_dict[ind] = pos_name
+    #     os.chdir(cur_dir)
+    #     self.pos_dict = pos_dict
+    #     self.lane_dict = lane_dict
+    #     self.pos_offset = pos_offset
 
     def tiff_extractor(self, pos):
         nd2 = nd2reader.Nd2(self.nd2_f)
@@ -132,15 +135,19 @@ class ND2_extractor():
             pass
         os.chdir(new_dir)
 
-
         if self.pos_dict:
-            meta_name = self.nd2_file_name + "_" + self.pos_dict[pos] + "_Time_"  #TODO: name pattern changed
+            meta_name = self.nd2_file_name + "_" + self.pos_dict[pos] + "_Time_"
         else:
-            meta_name = self.nd2_file_name + "_pos_" + str(pos - pos_off).zfill(3) + "_Time_" #TODO: name pattern changed
+            meta_name = self.nd2_file_name + "_pos_" + str(pos - pos_off).zfill(3) + "_Time_"
 
         for image in nd2.select(fields_of_view=pos):
             channel = image._channel
-            channel = str(channel.encode('ascii', 'ignore'))
+
+            channel = channel.encode('ascii', 'ignore')
+            channel = str(channel.decode("utf-8"))
+            # channel = str(channel.encode('ascii', 'ignore'))
+            # experimental, may not work
+
             time_point = image.frame_number
             tiff_name = meta_name + str(time_point).zfill(4) + "_c_" + channel + ".tiff"
 
@@ -185,17 +192,12 @@ class ND2_extractor():
         time_elapsed = datetime.now() - start_t
         print('Time elapsed for extraction (hh:mm:ss.ms) {}'.format(time_elapsed))
 
-
 #############
 # todo: rotation correction for poor aligned chips
 class trench_kymograph():
     def __init__(self, nd2_file, main_directory, lane, pos, channel, seg_channel, spatial,trench_length=None, trench_width=None,
                 correct_drift=0, found_drift = 0, frame_start=None, frame_limit=None, output_dir=None,
                  box_info=None, saving_option = 0, clean_up=1, chip_length=None, chip_width=None, magnification = None):
-    # def __init__(self, nd2_file, main_directory, lane, pos, channel, seg_channel, trench_length, trench_width,
-    #              spatial,
-    #              drift_correct=0, find_correct=0, frame_start=None, frame_limit=None, output_dir=None,
-    #              box_info=None):
         self.prefix = nd2_file[:-4]
         self.main_path = main_directory
         self.lane = lane
@@ -957,7 +959,6 @@ class trench_kymograph():
             try:
                 os.makedirs(kymo_path_stack)
             except OSError:
-                # print("???")
                 pass
         if self.saving_option != 0:
             kymo_path_kymo = os.path.join(kymo_path, "Kymograph")
@@ -965,7 +966,6 @@ class trench_kymograph():
             try:
                 os.makedirs(kymo_path_kymo)
             except OSError:
-                # print("????")
                 pass
 
         for ii in range(len(self.box_info)):
@@ -998,33 +998,34 @@ class trench_kymograph():
                             move_x = 0
                             move_y = 0
                         for t_i in range(trench_num):
-
                             trench_left, trench_right = ind_list[t_i]
                             trench = np.zeros((lower_index - upper_index, self.trench_width))
                             trench[:,:max(0, trench_left+move_x)+self.trench_width] = im_t[upper_index+move_y:lower_index+move_y, max(0, trench_left+move_x):max(0, trench_left+move_x)+self.trench_width]
                             all_kymo[t_i][f_i] = trench.astype(np.uint16)
 
                     for t_i in range(trench_num):
+                        trench_left, trench_right = ind_list[t_i]
+                        trench_middle = str(int((trench_left+trench_right)/2)) # for the naming
                         if "_top" in self.box_info[ii]:  # top trench
                             if self.saving_option !=0:  # save kymo
                                 trench_name = kymo_path_kymo + "/Kymo_Lane_" + str(self.lane).zfill(
                                     2) + "_pos_" + str(
-                                    self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(2) + "_top_c_"+ self.channel+".tiff"
+                                    self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(2) + "_top_c_"+ self.channel + "x_middle_" + trench_middle + ".tiff"
                             if self.saving_option !=1: # save stacks
                                 trench_name_stack = kymo_path_stack + "/Stack_Lane_" + str(self.lane).zfill(
                                     2) + "_pos_" + str(
-                                    self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(2) + "_top_c_" + self.channel + ".tiff"
+                                    self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(2) + "_top_c_" + self.channel + "x_middle_" + trench_middle + ".tiff"
                         else:   # bottom trench
                             if self.saving_option != 0:  # save kymo
                                 trench_name = kymo_path_kymo + "/Kymo_Lane_" + str(self.lane).zfill(
                                     2) + "_pos_" + str(
-                                    self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(2) + "_bottom_c_"+ self.channel+".tiff"
+                                    self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(2) + "_bottom_c_"+ self.channel+ "x_middle_" + trench_middle + ".tiff"
                             if self.saving_option != 1: # save stack
                                 trench_name_stack = kymo_path_stack + "/Stack_Lane_" + str(self.lane).zfill(
                                     2) + "_pos_" + str(
                                     self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(
-                                    2) + "_bottom_c_" + self.channel + ".tiff"
-                        # TODO
+                                    2) + "_bottom_c_" + self.channel + "x_middle_" + trench_middle + ".tiff"
+
                         if self.saving_option != 1:  # save stacks
                             imsave(trench_name_stack,all_kymo[t_i].astype(np.uint16))
                         if self.saving_option != 0:  # save kymo
@@ -1483,8 +1484,19 @@ if __name__ == "__main__":
 
 
 
+
+
+    # extractor part
+
+    file_directory = "/Volumes/SysBio/PAULSSON LAB/Somenath/DATA_Ti4/20180912_MM_Wash_HADA-TDL-SB8"
+    nd2_file = "Bleach_HADA.nd2"
+    new_extractor = ND2_extractor(nd2_file, file_directory)
+    new_extractor.run_extraction()
+
+
     # #
-    # # # TODO: Change me
+    # #  Kymograph part
+    #  TODO: Change me
     # # nd2_file = "40x_Ph2_Test_1.7.nd2"
     # # # #
     # # file_directory = r"/Volumes/SysBio/PAULSSON LAB/Somenath/DATA_Ti3/20180731/"
