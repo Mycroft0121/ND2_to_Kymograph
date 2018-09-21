@@ -1000,7 +1000,10 @@ class trench_kymograph():
                         for t_i in range(trench_num):
                             trench_left, trench_right = ind_list[t_i]
                             trench = np.zeros((lower_index - upper_index, self.trench_width))
-                            trench[:,:max(0, trench_left+move_x)+self.trench_width] = im_t[upper_index+move_y:lower_index+move_y, max(0, trench_left+move_x):max(0, trench_left+move_x)+self.trench_width]
+                            try:
+                                trench[:,:max(0, trench_left+move_x)+self.trench_width] = im_t[upper_index+move_y:lower_index+move_y, max(0, trench_left+move_x):max(0, trench_left+move_x)+self.trench_width]
+                            except:
+                                trench[:, :trench_left+ self.trench_width] = im_t[upper_index:lower_index,trench_left:trench_left + self.trench_width]
                             all_kymo[t_i][f_i] = trench.astype(np.uint16)
 
                     for t_i in range(trench_num):
