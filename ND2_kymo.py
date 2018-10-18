@@ -1491,11 +1491,11 @@ if __name__ == "__main__":
 
     # extractor part
 
-    file_directory = "/Volumes/SysBio/PAULSSON LAB/Somenath/DATA_Ti4/20180912_MM_Wash_HADA-TDL-SB8"
-    nd2_file = "Bleach_HADA.nd2"
-    new_extractor = ND2_extractor(nd2_file, file_directory)
-    new_extractor.run_extraction()
-
+    file_directory = "/Volumes/SysBio/PAULSSON LAB/Suyang/DATA_Ti4/20181013/"
+    nd2_file = "w1.7UM_3lane.nd2"
+    # new_extractor = ND2_extractor(nd2_file, file_directory)
+    # new_extractor.run_extraction()
+    #
 
     # #
     # #  Kymograph part
@@ -1503,36 +1503,35 @@ if __name__ == "__main__":
     # # nd2_file = "40x_Ph2_Test_1.7.nd2"
     # # # #
     # # file_directory = r"/Volumes/SysBio/PAULSSON LAB/Somenath/DATA_Ti3/20180731/"
-    # lanes = range(1,2)  # has to be a list lanes = [1,3,5]
-    # poses = range(2, 67)  # second value exclusive
-    #
-    # seg_channel = 'RFP'
-    #
-    # other_channels = ['GFP','BF'] # has to be a list
-    #
-    # # in pixels, measure in FIJI with a rectangle
-    # trench_width = 30
-    # trench_length = 250
-    # spatial = 2 #0=TOP, 1=BOTTOM, 2= TOP & BOTTOM
-    # frame_start = 1 #index start in 0
-    #
-    #
-    # # Some default parameters, change accordingly
-    # correct_drift = 0  # if want correction for drift, set to 1, only works for fluorescent channel
-    # found_drift = 0
-    # frame_start = None
-    # frame_limit = None
-    # output_dir = None
-    # box_info = None
-    # saving_option = 0   # 0 for only stack, 1 for kymograph, 2 for both
-    # clean_up = 1 #remove phase contrast intermediate processes (put to 0 to check how kymograph is working)
-    # chip_length = None #give the lenfth in micron
-    # chip_width = None
-    # magnification = None #magnification used for Ti3/Ti4 scopes
-    # # TODO: Don't touch me!
-    # found_drift = 0
-    #
-    # ## use this if changed default parameters
-    # run_kymo_generator(nd2_file, file_directory, lanes, poses, other_channels, seg_channel,  trench_length, trench_width,
-    #                            spatial, correct_drift, found_drift,frame_start, frame_limit, output_dir, box_info,
-    #                            saving_option, clean_up, chip_length, chip_width, magnification)
+    lanes = range(1, 2)  # has to be a list lanes = [1,3,5]
+    poses = range(3, 4)  # second value exclusive
+
+    seg_channel = 'BF'
+
+    other_channels = [] # has to be a list
+
+    # in pixels, measure in FIJI with a rectangle
+    trench_width = 14
+    trench_length = 245
+    spatial = 2 #0=TOP, 1=BOTTOM, 2= TOP & BOTTOM
+    frame_start = 10 #index start in 0
+
+
+    # Some default parameters, change accordingly
+    correct_drift = 0  # if want correction for drift, set to 1, only works for fluorescent channel
+    found_drift = 0
+    frame_limit = None
+    output_dir = None
+    box_info = None
+    saving_option = 0   # 0 for only stack, 1 for kymograph, 2 for both
+    clean_up = 0 #remove phase contrast intermediate processes (put to 0 to check how kymograph is working)
+    chip_length = None #give the lenfth in micron
+    chip_width = None
+    magnification = None #magnification used for Ti3/Ti4 scopes
+    # TODO: Don't touch me!
+    found_drift = 0
+
+    ## use this if changed default parameters
+    run_kymo_generator(nd2_file, file_directory, lanes, poses, other_channels, seg_channel,  trench_length, trench_width,
+                               spatial, correct_drift, found_drift,frame_start, frame_limit, output_dir, box_info,
+                               saving_option, clean_up, chip_length, chip_width, magnification)
