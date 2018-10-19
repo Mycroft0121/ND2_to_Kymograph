@@ -1013,21 +1013,20 @@ class trench_kymograph():
                             if self.saving_option !=0:  # save kymo
                                 trench_name = kymo_path_kymo + "/Kymo_Lane_" + str(self.lane).zfill(
                                     2) + "_pos_" + str(
-                                    self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(2) + "_top_c_"+ self.channel + "x_middle_" + trench_middle + ".tiff"
+                                    self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(2) + "_top_x_middle_" + trench_middle +"_channel_"+ self.channel + ".tiff"
                             if self.saving_option !=1: # save stacks
                                 trench_name_stack = kymo_path_stack + "/Stack_Lane_" + str(self.lane).zfill(
                                     2) + "_pos_" + str(
-                                    self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(2) + "_top_c_" + self.channel + "x_middle_" + trench_middle + ".tiff"
+                                    self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(2) + "_top_x_middle_" + trench_middle +"_channel_"+ self.channel + ".tiff"
                         else:   # bottom trench
                             if self.saving_option != 0:  # save kymo
                                 trench_name = kymo_path_kymo + "/Kymo_Lane_" + str(self.lane).zfill(
                                     2) + "_pos_" + str(
-                                    self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(2) + "_bottom_c_"+ self.channel+ "x_middle_" + trench_middle + ".tiff"
+                                    self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(2) + "_bottom_x_middle_" + trench_middle +"_channel_"+ self.channel + ".tiff"
                             if self.saving_option != 1: # save stack
                                 trench_name_stack = kymo_path_stack + "/Stack_Lane_" + str(self.lane).zfill(
                                     2) + "_pos_" + str(
-                                    self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(
-                                    2) + "_bottom_c_" + self.channel + "x_middle_" + trench_middle + ".tiff"
+                                    self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(2) + "_bottom_x_middle_" + trench_middle +"_channel_"+ self.channel + ".tiff"
 
                         if self.saving_option != 1:  # save stacks
                             imsave(trench_name_stack,all_kymo[t_i].astype(np.uint16))
@@ -1061,18 +1060,20 @@ class trench_kymograph():
                                 trench_dict[t_i][f_i] = im_t[cur_box[0]:cur_box[1], cur_box[2]:cur_box[3]]
 
                         for t_i in range(trench_num):
+                            cur_box = self.bbox_list[t_i]
+                            trench_middle = (cur_box[3] +cur_box[2])//2
                             # save stack
                             if self.saving_option != 1:
                                 trench_stack_name = kymo_path_stack + "/Stack_Lane_" + str(self.lane).zfill(2) + "_pos_" + str(
                                     self.pos).zfill(
-                                    3) + "_trench_" + str(t_i + 1).zfill(2) + "_channel_" + self.channel + "_top.tiff"
+                                    3) + "_trench_" + str(t_i + 1).zfill(2) + "_top_x_middle_" + trench_middle +"_channel_"+ self.channel + ".tiff"
 
                                 imsave(trench_stack_name, trench_dict[t_i].astype(np.uint16))
                             # save kymo
                             if self.saving_option != 0:
                                 trench_kymo_name = kymo_path_kymo + "/Kymo_Lane_" + str(self.lane).zfill(2) + "_pos_" + str(
                                     self.pos).zfill(
-                                    3) + "_trench_" + str(t_i + 1).zfill(2) + "_channel_" + self.channel + "_top.tiff"
+                                    3) + "_trench_" + str(t_i + 1).zfill(2) + "_top_x_middle_" + trench_middle +"_channel_"+ self.channel + ".tiff"
                                 this_kymo = np.concatenate(trench_dict[t_i], axis=1).astype(np.uint16)
 
                                 out = PIL.Image.frombytes("I;16", (this_kymo.shape[1], this_kymo.shape[0]), this_kymo.tobytes())
@@ -1101,18 +1102,20 @@ class trench_kymograph():
                                 trench_dict[t_i][f_i] = im_t[cur_box[0]:cur_box[1], cur_box[2]:cur_box[3]]
 
                         for t_i in range(trench_num):
+                            cur_box = self.bbox_list[t_i]
+                            trench_middle = (cur_box[3] + cur_box[2]) // 2
                             # save stack
                             if self.saving_option != 1:
                                 trench_stack_name = kymo_path_stack + "/Stack_Lane_" + str(self.lane).zfill(2) + "_pos_" + str(
                                     self.pos).zfill(
-                                    3) + "_trench_" + str(t_i + 1).zfill(2) + "_channel_" + self.channel + "_bottom.tiff"
+                                    3) + "_trench_" + str(t_i + 1).zfill(2) + "_bottom_x_middle_" + trench_middle +"_channel_"+ self.channel + ".tiff"
 
                                 imsave(trench_stack_name, trench_dict[t_i].astype(np.uint16))
                             # save kymo
                             if self.saving_option != 0:
                                 trench_kymo_name = kymo_path_kymo + "/Kymo_Lane_" + str(self.lane).zfill(2) + "_pos_" + str(
                                     self.pos).zfill(
-                                    3) + "_trench_" + str(t_i + 1).zfill(2) + "_channel_" + self.channel + "_bottom.tiff"
+                                    3) + "_trench_" + str(t_i + 1).zfill(2) + "_bottom_x_middle_" + trench_middle +"_channel_"+ self.channel + ".tiff"
                                 this_kymo = np.concatenate(trench_dict[t_i], axis=1).astype(np.uint16)
 
                                 out = PIL.Image.frombytes("I;16", (this_kymo.shape[1], this_kymo.shape[0]),
