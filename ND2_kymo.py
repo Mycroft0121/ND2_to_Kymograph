@@ -1,7 +1,7 @@
 # ND2 extractor, Kymograph generator
 # author: Suyang Wan
 # product manager: Emanuele Leoncini, Somenath Bakshi
-# Special thanks for technical support: Sadik Yidik
+# Special thanks for technical support: Carlos Sanchez, Sadik Yidik
 #
 #
 # Library dependence:
@@ -19,6 +19,7 @@ import glob  # pathname pattern
 from PIL import Image
 import nd2reader
 import os
+import cv2
 import PIL
 import numpy as np
 from pims import ND2_Reader
@@ -197,7 +198,7 @@ class ND2_extractor():
 class trench_kymograph():
     def __init__(self, nd2_file, main_directory, lane, pos, channel, seg_channel, spatial,trench_length=None, trench_width=None,
                 correct_drift=0, found_drift = 0, frame_start=None, frame_limit=None, output_dir=None,
-                 box_info=None, saving_option = 0, clean_up=1, chip_length=None, chip_width=None, magnification = None):
+                 box_info=None, saving_option = 0, clean_up=1, chip_length=None, chip_width=None, magnification = None, template=None,kymo_enhanced=0):
         self.prefix = nd2_file[:-4]
         self.main_path = main_directory
         self.lane = lane
@@ -249,6 +250,14 @@ class trench_kymograph():
         self.chip_length = chip_length
         self.chip_width  = chip_width
 
+
+        ## template matching in phase with
+        self.template = template   # format[y_top:y_bottom, x_left:x_right]
+
+
+        self.kymo_enhance = kymo_enhanced
+
+
         # 6.5 is the magic number for Ti3, Ti4
         if ((self.trench_length or self.chip_length) is None) or ((self.trench_width or self.chip_width) is None):
             print("Error: trench dimension not specified")
@@ -263,7 +272,7 @@ class trench_kymograph():
                 print("Error: magnification not specified")
                 #exit()
             self.trench_width = int((self.chip_width/6.5*self.magnification))
-            if self.seg_channel !='BF' or self.seg_channel !='Phase':   # if not phase contrast, dilate trench width
+            if self.seg_channel !='BF' and self.seg_channel !='Phase':   # if not phase contrast, dilate trench width
                 self.trench_width *= 1.2
 
         # TODO: change the path pattern if you didn't extract the ND2 with my extractor
@@ -288,12 +297,11 @@ class trench_kymograph():
         os.chdir(file_path)
 
         # special case for testing
-        self.file_list = glob.glob(spatial+'*_c_*' + channel  + '*.tif*')
+        self.file_list = glob.glob(spatial+'*_c_*' + channel + '*.tif*')
         first_file = skio.imread(self.file_list[0])
         first_shape = first_file.shape
         if len(first_shape) == 3:
             self.is_stack = 1
-
             self.stack_length = first_shape[0]
             if self.frame_start is None:
                 self.frame_start = 0
@@ -380,6 +388,48 @@ class trench_kymograph():
         self.found_drift = 1
         return
 
+
+    def find_drift_phase(self):
+        lane_path = self.file_path
+        file_num = len(self.file_list)
+
+
+        drift_y = open(lane_path + '/drift_y.txt', 'w')
+        drift_x = open(lane_path + '/drift_x.txt', 'w')
+        x_shift = np.zeros((file_num))
+        y_shift = np.zeros((file_num))
+
+        method = 'cv2.TM_CCOEFF_NORMED'
+        method = eval(method)
+        im_prev = self.get_frame(0).astype(np.float32)
+        template = im_prev[self.template[0]:self.template[1], self.template[2]:self.template[3]]
+
+        x_ref = self.template[2]
+        y_ref = self.template[0]
+        for i in range(1,file_num):
+            im_now = self.get_frame(i).astype(np.float32)
+            res = cv2.matchTemplate(template, im_now, method)
+
+            min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
+
+            x_shift[i] = max_loc[0] - x_ref
+            y_shift[i] = max_loc[1] - y_ref
+            # x_shift[i] = -max_loc[0] + x_ref
+            # y_shift[i] = -max_loc[1] + y_ref
+
+        x_shift = x_shift.astype(int)
+        y_shift = y_shift.astype(int)
+        drift_x.write(' '.join(map(str, x_shift.tolist())))
+        drift_y.write(' '.join(map(str, y_shift.tolist())))
+
+        self.drift_x = x_shift
+        self.drift_y = y_shift
+        self.drift_x_txt = 'drift_x.txt'
+        self.drift_y_txt = 'drift_y.txt'
+        self.found_drift = 1
+        return
+
+
     def read_drift(self):
         self.drift_x_txt = 'drift_x.txt'
         self.drift_y_txt = 'drift_y.txt'
@@ -394,7 +444,10 @@ class trench_kymograph():
 
     def find_top(self, i):
         im_i = pl.imread(self.file_list[i])
-        x_per = np.percentile(im_i, 95, axis=1)
+        if self.seg_channel == "BF" or self.seg_channel == "Phase":
+            x_per = np.percentile(im_i, 70, axis=1)
+        else:
+            x_per = np.percentile(im_i, 95, axis=1)
         intensity_scan = x_per
         intensity_scan = intensity_scan / float(sum(intensity_scan))
         # normalize intensity
@@ -457,12 +510,19 @@ class trench_kymograph():
             if self.found_drift== 1:
 
                 # correct for drift
+                # TODO: add y drift
                 move_x = self.drift_x[i]
+                move_y = self.drift_y[i]
                 temp = np.zeros((self.height, self.width))
                 if move_x>0:
                     temp[:, :self.width-move_x] = im_i[:,move_x:]
                 else:
                     temp[:,(-move_x):] = im_i[:,:self.width+move_x]
+
+                # if move_y>0:
+                #     temp[:self.width-move_y,:] = im_i[move_y:,:]
+                # else:
+                #     temp[(-move_y):,:] = im_i[:self.height+move_y,:]
                 im_i = temp
 
             im_stack[i] = im_i
@@ -475,8 +535,13 @@ class trench_kymograph():
 
 
         # identify tops & bottoms
-        x_per = np.percentile(perc, 90, axis=1)
-        intensity_scan = x_per
+
+        if self.seg_channel == "BF" or self.seg_channel == "Phase":
+            intensity_scan = np.percentile(perc, 70, axis=1)
+        else:
+            intensity_scan = np.percentile(perc, 90, axis=1)
+
+
         intensity_scan = intensity_scan / float(sum(intensity_scan))
         # normalize intensity
         im_min = intensity_scan.min()
@@ -486,13 +551,13 @@ class trench_kymograph():
         intensity_scan = (intensity_scan / scaling_factor)
 
         if self.spatial != 1:  # top
-            top = np.where(intensity_scan > 0.2)[0][0] - 30
-            bottom = top + self.trench_length + 60
+            top = np.where(intensity_scan > 0.2)[0][0] - 10
+            bottom = top + self.trench_length
             self.tops.append(top)
             self.bottoms.append(bottom)
         if self.spatial != 0:  # bottom
-            bottom = np.where(intensity_scan > 0.2)[0][-1] + 30
-            top = bottom - self.trench_length - 60
+            bottom = np.where(intensity_scan > 0.2)[0][-1] + 10
+            top = bottom - self.trench_length
             self.tops.append(top)
             self.bottoms.append(bottom)
 
@@ -572,7 +637,6 @@ class trench_kymograph():
             hf.close()
         return
 
-    # Phase contrast trench detection
 
     def background_enhance(self):
         self.get_file_list()  # run on original data
@@ -601,6 +665,19 @@ class trench_kymograph():
             cim = contrast.enhance(3)
             cim.save(os.path.join(self.enhanced_path, new_name))
         return
+
+    def enhance_kymo(self,im_i):
+        if np.max(im_i) > 255:
+            im_i = self.to_8_bit(im_i)
+        im_g = 255 * filters.gaussian(im_i, sigma=10)
+        im_i = (im_i - im_g)
+        im_i[im_i < 0] = 0
+        cim = Image.fromarray((im_i).astype(np.uint8))
+        contrast = ImageEnhance.Contrast(cim)
+        cim = contrast.enhance(3)
+        # cim.save(os.path.join(self.enhanced_path, new_name))
+        return np.array(cim)
+
 
     # add spatial support
     def auto_crop(self):
@@ -924,19 +1001,21 @@ class trench_kymograph():
         return
 
     def kymograph(self):
-        if self.seg_channel != 'BF' or self.seg_channel != 'Phase':
-            if self.box_info is None:
-                self.box_info = []
-                if self.spatial == 2:
-                    h5_name_top = "Lane_" + str(self.lane).zfill(2) + "_pos_" + str(self.pos).zfill(3) + "_top.h5"
-                    self.box_info.append(h5_name_top)
-                    h5_name_bottom = "Lane_" + str(self.lane).zfill(2) + "_pos_" + str(self.pos).zfill(3) + "_bottom.h5"
-                    self.box_info.append(h5_name_bottom)
-                else:
-                    local = ['top', 'bottom']
-                    h5_name = "Lane_" + str(self.lane).zfill(2) + "_pos_" + str(self.pos).zfill(3) + "_" + local[
-                        self.spatial] + ".h5"
-                    self.box_info.append(h5_name)
+
+        if self.box_info is None:
+            self.box_info = []
+            if self.spatial == 2:
+                h5_name_top = "Lane_" + str(self.lane).zfill(2) + "_pos_" + str(self.pos).zfill(3) + "_top.h5"
+                self.box_info.append(h5_name_top)
+                h5_name_bottom = "Lane_" + str(self.lane).zfill(2) + "_pos_" + str(self.pos).zfill(3) + "_bottom.h5"
+                self.box_info.append(h5_name_bottom)
+            else:
+                local = ['top', 'bottom']
+                h5_name = "Lane_" + str(self.lane).zfill(2) + "_pos_" + str(self.pos).zfill(3) + "_" + local[
+                    self.spatial] + ".h5"
+                self.box_info.append(h5_name)
+
+
 
         os.chdir(self.file_path)
         self.get_file_list()  # get file list
@@ -968,9 +1047,10 @@ class trench_kymograph():
             except OSError:
                 pass
 
-        for ii in range(len(self.box_info)):
-            hf = h5py.File(self.box_info[ii], 'r')
-            if self.seg_channel !='BF' or self.seg_channel !='Phase':
+
+        if self.kymo_enhance and ( self.channel=="BF" or self.channel=="Phase"):
+            for ii in range(len(self.box_info)):
+                hf = h5py.File(self.box_info[ii], 'r')
                 ind_list = hf.get('box').value
                 upper_index = hf.get('upper_index').value
                 lower_index = hf.get('lower_index').value
@@ -989,6 +1069,7 @@ class trench_kymograph():
                             continue
 
                         im_t = pl.imread(file_i)
+                        im_t = self.enhance_kymo(im_t)
                         if self.found_drift == 1:
                             self.read_drift()
                             # correct for drift
@@ -1001,35 +1082,42 @@ class trench_kymograph():
                             trench_left, trench_right = ind_list[t_i]
                             trench = np.zeros((lower_index - upper_index, self.trench_width))
                             try:
-                                trench[:,:max(0, trench_left+move_x)+self.trench_width] = im_t[upper_index+move_y:lower_index+move_y, max(0, trench_left+move_x):max(0, trench_left+move_x)+self.trench_width]
+                                trench[:, :max(0, trench_left + move_x) + self.trench_width] =\
+                                    im_t[upper_index + move_y:lower_index + move_y, max(0,trench_left + move_x):
+                                                                                    max(0,trench_left + move_x) + self.trench_width]
                             except:
-                                trench[:, :trench_left+ self.trench_width] = im_t[upper_index:lower_index,trench_left:trench_left + self.trench_width]
+                                trench[:, :trench_left + self.trench_width] = im_t[upper_index:lower_index,
+                                                                              trench_left:trench_left + self.trench_width]
                             all_kymo[t_i][f_i] = trench.astype(np.uint16)
 
                     for t_i in range(trench_num):
                         trench_left, trench_right = ind_list[t_i]
-                        trench_middle = str(int((trench_left+trench_right)/2)) # for the naming
+                        trench_middle = str(int((trench_left + trench_right) / 2))  # for the naming
                         if "_top" in self.box_info[ii]:  # top trench
-                            if self.saving_option !=0:  # save kymo
-                                trench_name = kymo_path_kymo + "/Kymo_Lane_" + str(self.lane).zfill(
-                                    2) + "_pos_" + str(
-                                    self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(2) + "_top_x_middle_" + trench_middle +"_channel_"+ self.channel + ".tiff"
-                            if self.saving_option !=1: # save stacks
-                                trench_name_stack = kymo_path_stack + "/Stack_Lane_" + str(self.lane).zfill(
-                                    2) + "_pos_" + str(
-                                    self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(2) + "_top_x_middle_" + trench_middle +"_channel_"+ self.channel + ".tiff"
-                        else:   # bottom trench
                             if self.saving_option != 0:  # save kymo
-                                trench_name = kymo_path_kymo + "/Kymo_Lane_" + str(self.lane).zfill(
+                                trench_name = kymo_path_kymo + "/Kymo_enhanced_Lane_" + str(self.lane).zfill(
                                     2) + "_pos_" + str(
-                                    self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(2) + "_bottom_x_middle_" + trench_middle +"_channel_"+ self.channel + ".tiff"
-                            if self.saving_option != 1: # save stack
-                                trench_name_stack = kymo_path_stack + "/Stack_Lane_" + str(self.lane).zfill(
+                                    self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(
+                                    2) + "_top_x_middle_" + trench_middle + "_c_" + self.channel + ".tiff"
+                            if self.saving_option != 1:  # save stacks
+                                trench_name_stack = kymo_path_stack + "/Stack_enhanced_Lane_" + str(self.lane).zfill(
                                     2) + "_pos_" + str(
-                                    self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(2) + "_bottom_x_middle_" + trench_middle +"_channel_"+ self.channel + ".tiff"
+                                    self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(
+                                    2) + "_top_x_middle_" + trench_middle + "_c_" + self.channel + ".tiff"
+                        else:  # bottom trench
+                            if self.saving_option != 0:  # save kymo
+                                trench_name = kymo_path_kymo + "/Kymo_enhanced_Lane_" + str(self.lane).zfill(
+                                    2) + "_pos_" + str(
+                                    self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(
+                                    2) + "_bottom_x_middle_" + trench_middle + "_c_" + self.channel + ".tiff"
+                            if self.saving_option != 1:  # save stack
+                                trench_name_stack = kymo_path_stack + "/Stack_Lane_enhanced_" + str(self.lane).zfill(
+                                    2) + "_pos_" + str(
+                                    self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(
+                                    2) + "_bottom_x_middle_" + trench_middle + "_c_" + self.channel + ".tiff"
 
                         if self.saving_option != 1:  # save stacks
-                            imsave(trench_name_stack,all_kymo[t_i].astype(np.uint16))
+                            imsave(trench_name_stack, all_kymo[t_i].astype(np.uint16))
                         if self.saving_option != 0:  # save kymo
                             this_kymo = np.concatenate(all_kymo[t_i], axis=1).astype(np.uint16)
                             out = PIL.Image.frombytes("I;16", (this_kymo.shape[1], this_kymo.shape[0]), this_kymo.tobytes())
@@ -1037,112 +1125,100 @@ class trench_kymograph():
                         all_kymo[t_i] = None
                 else:
                     print("no trenches detected")
-            else: # segmented with phase
-                if self.spatial !=1: #top
-                    if not self.bad_pos[0]:
-                        self.bbox_list = self.bbox_dict[0]
-                        trench_num = len(self.bbox_list)
-                        trench_dict = {}
-                        for i in range(trench_num):
-                            cur_box = self.bbox_list[i]
-                            # print(self.ytop, cur_box[0], self.ybot,cur_box[1])
-                            trench_dict[i] = np.zeros((self.file_length, cur_box[1] - cur_box[0], cur_box[3] - cur_box[2]))
-                        for f_i in range(self.file_length):
-                            try:
-                                file_i = self.file_list[f_i]
-                            except:
-                                print("something is wrong")
-                                continue
-                            im_t = pl.imread(file_i)
 
-                            for t_i in range(trench_num):
-                                cur_box = self.bbox_list[t_i]
-                                trench_dict[t_i][f_i] = im_t[cur_box[0]:cur_box[1], cur_box[2]:cur_box[3]]
-
+        else:
+            for ii in range(len(self.box_info)):
+                hf = h5py.File(self.box_info[ii], 'r')
+                ind_list = hf.get('box').value
+                upper_index = hf.get('upper_index').value
+                lower_index = hf.get('lower_index').value
+                hf.close()
+                trench_num = len(ind_list)
+                if trench_num > 0:
+                    all_kymo = {}
+                    for t_i in range(trench_num):
+                        all_kymo[t_i] = np.zeros((len(self.file_list), lower_index - upper_index, self.trench_width))
+                    # file_list = ori_files[self.frame_start:self.frame_limit]
+                    for f_i in range(len(self.file_list)):
+                        try:
+                            file_i = self.file_list[f_i]
+                        except:
+                            print("something is wrong")
+                            continue
+                        im_t = pl.imread(file_i)
+                        if self.found_drift == 1:
+                            self.read_drift()
+                            # correct for drift
+                            move_x = self.drift_x[f_i]
+                            move_y = self.drift_y[f_i]
+                        else:
+                            move_x = 0
+                            move_y = 0
                         for t_i in range(trench_num):
-                            cur_box = self.bbox_list[t_i]
-                            trench_middle = (cur_box[3] +cur_box[2])//2
-                            # save stack
-                            if self.saving_option != 1:
-                                trench_stack_name = kymo_path_stack + "/Stack_Lane_" + str(self.lane).zfill(2) + "_pos_" + str(
-                                    self.pos).zfill(
-                                    3) + "_trench_" + str(t_i + 1).zfill(2) + "_top_x_middle_" + trench_middle +"_channel_"+ self.channel + ".tiff"
-
-                                imsave(trench_stack_name, trench_dict[t_i].astype(np.uint16))
-                            # save kymo
-                            if self.saving_option != 0:
-                                trench_kymo_name = kymo_path_kymo + "/Kymo_Lane_" + str(self.lane).zfill(2) + "_pos_" + str(
-                                    self.pos).zfill(
-                                    3) + "_trench_" + str(t_i + 1).zfill(2) + "_top_x_middle_" + trench_middle +"_channel_"+ self.channel + ".tiff"
-                                this_kymo = np.concatenate(trench_dict[t_i], axis=1).astype(np.uint16)
-
-                                out = PIL.Image.frombytes("I;16", (this_kymo.shape[1], this_kymo.shape[0]), this_kymo.tobytes())
-                                out.save(trench_kymo_name)
-                            trench_dict[t_i] = None
-
-                if self.spatial !=0: #bottom
-                    if not self.bad_pos[1]:
-                        self.bbox_list = self.bbox_dict[1]
-                        trench_num = len(self.bbox_list)
-                        trench_dict = {}
-                        for i in range(trench_num):
-                            cur_box = self.bbox_list[i]
-                            # print(self.ytop, cur_box[0], self.ybot,cur_box[1])
-                            trench_dict[i] = np.zeros((self.file_length, cur_box[1] - cur_box[0], cur_box[3] - cur_box[2]))
-                        for f_i in range(self.file_length):
+                            trench_left, trench_right = ind_list[t_i]
+                            trench = np.zeros((lower_index - upper_index, self.trench_width))
                             try:
-                                file_i = self.file_list[f_i]
+                                trench[:, :max(0, trench_left + move_x) + self.trench_width] = \
+                                    im_t[upper_index + move_y:lower_index + move_y, max(0, trench_left + move_x):
+                                                                                    max(0,
+                                                                                        trench_left + move_x) + self.trench_width]
                             except:
-                                print("something is wrong")
-                                continue
-                            im_t = pl.imread(file_i)
+                                trench[:, :trench_left + self.trench_width] = im_t[upper_index:lower_index,
+                                                                              trench_left:trench_left + self.trench_width]
+                            all_kymo[t_i][f_i] = trench.astype(np.uint16)
 
-                            for t_i in range(trench_num):
-                                cur_box = self.bbox_list[t_i]
-                                trench_dict[t_i][f_i] = im_t[cur_box[0]:cur_box[1], cur_box[2]:cur_box[3]]
+                    for t_i in range(trench_num):
+                        trench_left, trench_right = ind_list[t_i]
+                        trench_middle = str(int((trench_left + trench_right) / 2))  # for the naming
+                        if "_top" in self.box_info[ii]:  # top trench
+                            if self.saving_option != 0:  # save kymo
+                                trench_name = kymo_path_kymo + "/Kymo_Lane_" + str(self.lane).zfill(
+                                    2) + "_pos_" + str(
+                                    self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(
+                                    2) + "_top_x_middle_" + trench_middle + "_c_" + self.channel + ".tiff"
+                            if self.saving_option != 1:  # save stacks
+                                trench_name_stack = kymo_path_stack + "/Stack_Lane_" + str(self.lane).zfill(
+                                    2) + "_pos_" + str(
+                                    self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(
+                                    2) + "_top_x_middle_" + trench_middle + "_c_" + self.channel + ".tiff"
+                        else:  # bottom trench
+                            if self.saving_option != 0:  # save kymo
+                                trench_name = kymo_path_kymo + "/Kymo_Lane_" + str(self.lane).zfill(
+                                    2) + "_pos_" + str(
+                                    self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(
+                                    2) + "_bottom_x_middle_" + trench_middle + "_c_" + self.channel + ".tiff"
+                            if self.saving_option != 1:  # save stack
+                                trench_name_stack = kymo_path_stack + "/Stack_Lane_" + str(self.lane).zfill(
+                                    2) + "_pos_" + str(
+                                    self.pos).zfill(3) + "_trench_" + str(t_i + 1).zfill(
+                                    2) + "_bottom_x_middle_" + trench_middle + "_c_" + self.channel + ".tiff"
 
-                        for t_i in range(trench_num):
-                            cur_box = self.bbox_list[t_i]
-                            trench_middle = (cur_box[3] + cur_box[2]) // 2
-                            # save stack
-                            if self.saving_option != 1:
-                                trench_stack_name = kymo_path_stack + "/Stack_Lane_" + str(self.lane).zfill(2) + "_pos_" + str(
-                                    self.pos).zfill(
-                                    3) + "_trench_" + str(t_i + 1).zfill(2) + "_bottom_x_middle_" + trench_middle +"_channel_"+ self.channel + ".tiff"
-
-                                imsave(trench_stack_name, trench_dict[t_i].astype(np.uint16))
-                            # save kymo
-                            if self.saving_option != 0:
-                                trench_kymo_name = kymo_path_kymo + "/Kymo_Lane_" + str(self.lane).zfill(2) + "_pos_" + str(
-                                    self.pos).zfill(
-                                    3) + "_trench_" + str(t_i + 1).zfill(2) + "_bottom_x_middle_" + trench_middle +"_channel_"+ self.channel + ".tiff"
-                                this_kymo = np.concatenate(trench_dict[t_i], axis=1).astype(np.uint16)
-
-                                out = PIL.Image.frombytes("I;16", (this_kymo.shape[1], this_kymo.shape[0]),
-                                                          this_kymo.tobytes())
-                                out.save(trench_kymo_name)
-                            trench_dict[t_i] = None
+                        if self.saving_option != 1:  # save stacks
+                            imsave(trench_name_stack, all_kymo[t_i].astype(np.uint16))
+                        if self.saving_option != 0:  # save kymo
+                            this_kymo = np.concatenate(all_kymo[t_i], axis=1).astype(np.uint16)
+                            out = PIL.Image.frombytes("I;16", (this_kymo.shape[1], this_kymo.shape[0]),
+                                                      this_kymo.tobytes())
+                            out.save(trench_name)
+                        all_kymo[t_i] = None
+                else:
+                    print("no trenches detected")
         return
 
     def run_kymo(self):
-        if self.seg_channel != 'BF' or self.seg_channel != 'Phase':
-            self.get_file_list()
-            if self.channel == self.seg_channel:
-                if self.correct_drift == 1:
+        self.get_file_list()
+        if self.channel == self.seg_channel:
+
+            if self.correct_drift == 1:
+                if self.seg_channel != 'BF' and self.seg_channel != 'Phase':
+
                     self.find_drift()
-                self.get_trenches()
-            self.kymograph()
-            # identify
-            # if self.correct_drift == 1:
-            #     self.find_drift()
-            # else:
-            #     if self.channel == self.seg_channel:
-            #         self.get_trenches()
-                #     self.kymograph()
-                # else:
-                #     self.kymograph()
-        else:
-            self.run_kymo_phase()
+                else:
+
+                    self.find_drift_phase()
+            self.get_trenches()
+        self.kymograph()
+
         return
 
     @staticmethod
@@ -1153,26 +1229,6 @@ class trench_kymograph():
         im = (im - im_min)
         im = (im * 255. / scaling_factor).astype(np.uint8)
         return im
-
-    @staticmethod
-    def moveImage(im, move_x, move_y, pad=0):
-        """
-        Moves the image without changing frame dimensions, and
-        pads the edges with given value (default=0).
-        """
-        im_new = np.ones((im.shape[0], im.shape[1]), dtype=np.uint16) * pad
-        xbound = im.shape[1]
-        ybound = im.shape[0]
-        if move_x >= 0:
-            im_new[:, move_x:] = im[:, :xbound - move_x]
-        else:
-            im_new[:, :xbound + move_x] = im[:, -move_x:]
-        if move_y >= 0:
-            im_new[move_y:, :] = im[:ybound - move_y, :]
-        else:
-            im_new[:ybound + move_y, :] = im[-move_y:, :]
-        # print(im == im_new)
-        return im_new
 
     @staticmethod
     def detect_peaks(x, mph=None, mpd=1, threshold=0, edge='both', kpsh=False, valley=False, show=False, ax=None):
@@ -1352,6 +1408,9 @@ class trench_kymograph():
 
 ###############
 # test
+
+
+###TODO
 if __name__ == "__main__":
 
     # (nd2_file, file_directory, lanes, poses, other_channels, seg_channel, trench_length, trench_width,
@@ -1359,7 +1418,11 @@ if __name__ == "__main__":
      # saving_option, clean_up, chip_length, chip_width, magnification)
     def run_kymo_generator(nd2_file, main_directory, lanes, poses, other_channels, seg_channel,  trench_length, trench_width,
                            spatial, correct_drift=0, found_drift = 0, frame_start=None, frame_limit=None, output_dir=None, box_info=None,
-                           saving_option = 0, clean_up=1, chip_length=None, chip_width=None, magnification = None):
+                           saving_option = 0, clean_up=1, chip_length=None, chip_width=None, magnification = None,template=None,kymo_enhanced=0,core_fract=1):
+
+
+
+
 
         start_t = datetime.now()
         print("Kymo starts at ", start_t)
@@ -1370,11 +1433,11 @@ if __name__ == "__main__":
                 def helper_kymo(p):
                     new_kymo = trench_kymograph(nd2_file, main_directory, lane, p, channel, seg_channel,spatial, trench_length,
                                                 trench_width, correct_drift, found_drift, frame_start, frame_limit,
-                                                output_dir, box_info, saving_option, clean_up, chip_length, chip_width, magnification)
+                                                output_dir, box_info, saving_option, clean_up, chip_length, chip_width, magnification,template,kymo_enhanced)
                     new_kymo.run_kymo()
                     return 0
 
-                cores = int(multiprocessing.cpu_count()*0.5)
+                cores = int(multiprocessing.cpu_count()*core_frac)
                 jobs = []
                 batch_num = int(len(poses)/cores) + 1
 
@@ -1399,10 +1462,10 @@ if __name__ == "__main__":
                     def helper_kymo(p):
                         new_kymo = trench_kymograph(nd2_file, main_directory, lane, p, channel, seg_channel,spatial, trench_length,
                                                     trench_width,  correct_drift, found_drift, frame_start, frame_limit, output_dir,
-                                                    box_info, saving_option, clean_up, chip_length, chip_width, magnification)
+                                                    box_info, saving_option, clean_up, chip_length, chip_width, magnification,template,kymo_enhanced)
                         new_kymo.run_kymo()
 
-                    cores = int(multiprocessing.cpu_count()*0.5)
+                    cores = int(multiprocessing.cpu_count()*core_frac)
                     jobs = []
                     batch_num = int(len(poses) / cores) + 1
 
@@ -1431,11 +1494,11 @@ if __name__ == "__main__":
                 def helper_kymo(p):
                     new_kymo = trench_kymograph(nd2_file, main_directory, lane, p, channel, seg_channel,spatial, trench_length,
                                                 trench_width,  correct_drift, found_drift, frame_start, frame_limit,
-                                                output_dir, box_info, saving_option, clean_up, chip_length, chip_width, magnification)
+                                                output_dir, box_info, saving_option, clean_up, chip_length, chip_width, magnification,template,kymo_enhanced)
                     new_kymo.run_kymo()
                     return 0
 
-                cores = int(multiprocessing.cpu_count()*0.5)
+                cores = int(multiprocessing.cpu_count()*core_frac)
                 jobs = []
                 batch_num = int(len(poses)/cores) + 1
 
@@ -1460,10 +1523,11 @@ if __name__ == "__main__":
                     def helper_kymo(p):
                         new_kymo = trench_kymograph(nd2_file, main_directory, lane, p, channel, seg_channel,spatial, trench_length,
                                                     trench_width,  correct_drift , found_drift, frame_start, frame_limit, output_dir,
-                                                    box_info, saving_option, clean_up, chip_length, chip_width, magnification)
+                                                    box_info, saving_option, clean_up, chip_length, chip_width, magnification,template,kymo_enhanced)
                         new_kymo.run_kymo()
 
-                    cores = int(multiprocessing.cpu_count()*0.5)
+
+                    cores = int(multiprocessing.cpu_count() *core_frac)
                     jobs = []
                     batch_num = int(len(poses) / cores) + 1
 
@@ -1494,11 +1558,11 @@ if __name__ == "__main__":
 
     # extractor part
 
-    file_directory = "/Volumes/SysBio/PAULSSON LAB/Suyang/DATA_Ti4/20181013/"
-    nd2_file = "w1.7UM_3lane.nd2"
+    file_directory = r"/home/paulssonlab/Desktop/Paulsson_lab/PAULSSON LAB/Somenath/DATA_Ti4/20181021"
+    nd2_file = "test_3LaneSnake.nd2"
     # new_extractor = ND2_extractor(nd2_file, file_directory)
     # new_extractor.run_extraction()
-    #
+
 
     # #
     # #  Kymograph part
@@ -1507,22 +1571,25 @@ if __name__ == "__main__":
     # # # #
     # # file_directory = r"/Volumes/SysBio/PAULSSON LAB/Somenath/DATA_Ti3/20180731/"
     lanes = range(1, 2)  # has to be a list lanes = [1,3,5]
-    poses = range(3, 4)  # second value exclusive
+    poses = range(1, 3)  # second value exclusive
 
     seg_channel = 'BF'
 
     other_channels = [] # has to be a list
 
     # in pixels, measure in FIJI with a rectangle
-    trench_width = 14
-    trench_length = 245
+    trench_width = 12
+    trench_length = 185
     spatial = 2 #0=TOP, 1=BOTTOM, 2= TOP & BOTTOM
-    frame_start = 10 #index start in 0
+    frame_start = 0 #index start in 0
 
 
     # Some default parameters, change accordingly
-    correct_drift = 0  # if want correction for drift, set to 1, only works for fluorescent channel
-    found_drift = 0
+    correct_drift = 1  # if want correction for drift, set to 1
+    template = [100,300,200,1800]
+    kymo_enhanced = 0
+
+
     frame_limit = None
     output_dir = None
     box_info = None
@@ -1531,10 +1598,16 @@ if __name__ == "__main__":
     chip_length = None #give the lenfth in micron
     chip_width = None
     magnification = None #magnification used for Ti3/Ti4 scopes
+
+
+    # fraction of # cores want to use
+    core_frac =1
+
+
     # TODO: Don't touch me!
     found_drift = 0
 
     ## use this if changed default parameters
     run_kymo_generator(nd2_file, file_directory, lanes, poses, other_channels, seg_channel,  trench_length, trench_width,
                                spatial, correct_drift, found_drift,frame_start, frame_limit, output_dir, box_info,
-                               saving_option, clean_up, chip_length, chip_width, magnification)
+                               saving_option, clean_up, chip_length, chip_width, magnification,template,kymo_enhanced,core_frac)
