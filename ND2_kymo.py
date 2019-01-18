@@ -554,7 +554,7 @@ class trench_kymograph():
             top = np.where(intensity_scan > 0.2)[0][0] - 10
             bottom = top + self.trench_length
             if top <0 or bottom> self.height:
-                print("bad position at lane " + str(self.lane) + " position " + str(self.pos))
+                print("bad position at lane " + str(self.lane) + " position " + str(self.pos) + " top")
                 exit()
 
 
@@ -564,9 +564,8 @@ class trench_kymograph():
             bottom = np.where(intensity_scan > 0.2)[0][-1] + 10
             top = bottom - self.trench_length
             if top <0 or bottom> self.height:
-                print("bad position at lane " + str(self.lane) + " position " + str(self.pos))
+                print("bad position at lane " + str(self.lane) + " position " + str(self.pos) + " bottom")
                 exit()
-
             self.tops.append(top)
             self.bottoms.append(bottom)
 
