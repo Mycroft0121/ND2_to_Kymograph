@@ -103,6 +103,7 @@ class ND2_extractor():
             self.lanes = cur_lane
             self.nd2_new.close()
         else:
+            self.lanes = 1
             self.single_pos = True      # TODO: maybe unnecessary
         self.lane_dict = lane_dict
         self.pos_offset = pos_offset
@@ -206,7 +207,7 @@ class ND2_extractor():
 
     def run_extraction(self,):
         start_t = datetime.now()
-        self.select_cond()
+
 
         os.chdir(self.input_path)
         # get position name if xml is available

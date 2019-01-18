@@ -14,6 +14,7 @@
 
 #
 # # Todo: create a GUI
+
 import matplotlib.pyplot as pl
 import glob  # pathname pattern
 from PIL import Image
@@ -38,7 +39,6 @@ from scipy.signal import medfilt
 from scipy.ndimage.morphology import binary_dilation
 from PIL import Image, ImageEnhance
 import shutil
-
 
 # todo: fix extractor xml file problem
 # todo: new class for segmentation & lineage tracking
@@ -445,7 +445,7 @@ class trench_kymograph():
     def find_top(self, i):
         im_i = pl.imread(self.file_list[i])
         if self.seg_channel == "BF" or self.seg_channel == "Phase":
-            x_per = np.percentile(im_i, 70, axis=1)
+            x_per = np.percentile(im_i, 90, axis=1)
         else:
             x_per = np.percentile(im_i, 95, axis=1)
         intensity_scan = x_per
@@ -537,7 +537,7 @@ class trench_kymograph():
         # identify tops & bottoms
 
         if self.seg_channel == "BF" or self.seg_channel == "Phase":
-            intensity_scan = np.percentile(perc, 70, axis=1)
+            intensity_scan = np.percentile(perc, 85, axis=1)
         else:
             intensity_scan = np.percentile(perc, 90, axis=1)
 
@@ -553,11 +553,20 @@ class trench_kymograph():
         if self.spatial != 1:  # top
             top = np.where(intensity_scan > 0.2)[0][0] - 10
             bottom = top + self.trench_length
+            if top <0 or bottom> self.height:
+                print("bad position at lane " + str(self.lane) + " position " + str(self.pos))
+                exit()
+
+
             self.tops.append(top)
             self.bottoms.append(bottom)
         if self.spatial != 0:  # bottom
             bottom = np.where(intensity_scan > 0.2)[0][-1] + 10
             top = bottom - self.trench_length
+            if top <0 or bottom> self.height:
+                print("bad position at lane " + str(self.lane) + " position " + str(self.pos))
+                exit()
+
             self.tops.append(top)
             self.bottoms.append(bottom)
 
@@ -1580,14 +1589,14 @@ if __name__ == "__main__":
     # in pixels, measure in FIJI with a rectangle
     trench_width = 12
     trench_length = 185
-    spatial = 2 #0=TOP, 1=BOTTOM, 2= TOP & BOTTOM
+    spatial = 0 #0=TOP, 1=BOTTOM, 2= TOP & BOTTOM
     frame_start = 0 #index start in 0
 
 
     # Some default parameters, change accordingly
     correct_drift = 1  # if want correction for drift, set to 1
     template = [100,300,200,1800]
-    kymo_enhanced = 0
+    kymo_enhanced = 1
 
 
     frame_limit = None
