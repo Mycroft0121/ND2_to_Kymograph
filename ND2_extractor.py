@@ -50,6 +50,7 @@ import shutil
 class ND2_extractor():
     def __init__(self, nd2_file, file_directory, xml_file=None, xml_dir=None, output_path=None, frame_start=None, frame_end=None,
                  lanes_to_extract=None,channels_to_extract=None):
+        os.chdir(file_directory)
         self.input_path = file_directory
         self.nd2_file = nd2_file
         self.nd2_file_name = nd2_file[:-4]
@@ -67,6 +68,7 @@ class ND2_extractor():
         self.frames = None
         self.lanes = None
         self.poses_to_extract = None
+
 
 
         self.frame_start = frame_start
@@ -218,10 +220,12 @@ class ND2_extractor():
         # otherwise get lane info from y_um
         else:
             self.lane_info()
-        os.chdir(self.input_path)
+        # os.chdir(self.input_path)
+        self.channel_info()
+
 
         # switch to another ND2reader for faster iterations
-        nd2 = nd2reader.Nd2(self.nd2_file)
+        # nd2 = nd2reader.Nd2(self.nd2_file)
 
         main_dir = self.input_path + "/" + self.nd2_file_name
         try:
@@ -231,6 +235,7 @@ class ND2_extractor():
 
         # parallelize extraction
         # poses = nd2.fields_of_view
+        self.select_cond()
         poses = self.poses_to_extract
         cores = pathos.multiprocessing.cpu_count()
         print(poses, cores)
@@ -240,3 +245,25 @@ class ND2_extractor():
         time_elapsed = datetime.now() - start_t
         print('Time elapsed for extraction (hh:mm:ss.ms) {}'.format(time_elapsed))
 
+
+
+
+
+
+
+
+#
+# file_directory = r"/Volumes/SysBio/PAULSSON LAB/Carlos/Data_Ti3/Burdenless dyes/12232018/"
+# nd2_file = "Barcodes_HADA_RADA_WT.nd2"
+# #
+# # EXTRACTOR
+# new_extractor = ND2_extractor(nd2_file, file_directory)
+# new_extractor.run_extraction()
+
+# extractor par
+file_directory = r"/Volumes/SysBio/PAULSSON LAB/Carlos/Data_Ti3/Burdenless dyes/12232018"
+nd2_file = "HADA_RADA_WT.nd2"
+#
+# EXTRACTOR
+new_extractor = ND2_extractor(nd2_file, file_directory)
+new_extractor.run_extraction()
